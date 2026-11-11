@@ -1,65 +1,132 @@
-"use client"
 
+"use client";
+
+import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import React, { useState } from 'react'
-import Image from 'next/image'
+import Image from "next/image";
+import Link from "next/link";
+import { Menu, X, ArrowRight } from "lucide-react";
+
+const navLinks = [
+  { name: "Home", href: "/dashboard" },
+  { name: "Features", href: "/#features" },
+  { name: "Pricing", href: "/#pricing" },
+  { name: "Contact", href: "/#contact" },
+];
+
 const Navbar = () => {
-    const [menudisplay, setMenudisplay] = useState(false)
-      const router = useRouter();
+  const [menuDisplay, setMenuDisplay] = useState(false);
+  const router = useRouter();
+
+  const closeMenu = () => setMenuDisplay(false);
+
+  const handleGetStarted = () => {
+    closeMenu();
+    router.push("/dashboard");
+  };
+
   return (
-    <header className="w-full flex justify-center items-center">
-        <nav className="flex lg:hidden items-center justify-center p-3 bg-white text-slate-800 top-5 w-full shadow-lg rounded-lg absolute z-20">
+    <header className="absolute top-0 left-0 z-50 w-full px-3 pt-4 sm:px-6 sm:pt-5 lg:px-10">
+      <nav
+        aria-label="Main navigation"
+        className="relative mx-auto flex w-full max-w-7xl items-center justify-between rounded-2xl border border-slate-200/80 bg-white/90 px-4 py-3 shadow-[0_8px_30px_rgba(15,23,42,0.07)] backdrop-blur-xl sm:px-6 lg:px-8"
+      >
+        {/* Logo */}
+        <Link
+          href="/dashboard"
+          onClick={closeMenu}
+          className="flex shrink-0 items-center gap-2.5"
+          aria-label="TaskFlow home"
+        >
+          <Image
+            src="/icon.png"
+            alt="TaskFlow logo"
+            width={44}
+            height={44}
+            priority
+            className="h-9 w-9 object-contain sm:h-11 sm:w-11"
+          />
 
+          <span className="text-xl font-extrabold tracking-tight text-slate-900 sm:text-2xl">
+            Task<span className="text-blue-600">Flow</span>
+          </span>
+        </Link>
 
-            <button onClick={() => setMenudisplay(!menudisplay)} className='hamburhger absolute left-7 h-5 w-5'>
-                <Image src="/menu.png" alt="menu" width={400} height={300}  loading="eager" className={`w-full object-contain h-full transition-transform duration-200 ease-in-out ${menudisplay ? "rotate-90" : "rotate-0"} `}/>
-            </button>
-            {menudisplay && <ul className="flex flex-col items-center gap-5 absolute left-3 top-full mt-2 py-3 px-2 bg-white rounded-lg z-20">
-                <li onClick={() => router.push("/dashboard")} className="text-xl font-[500] w-full flex justify-center items-center active:text-blue-500 rounded-lg shadow active:scale-90 px-2 py-1 bg-gray-100" >Home</li>
-                <li className="text-xl font-[500] w-full flex justify-center items-center active:text-blue-500 rounded-lg shadow active:scale-90 px-2 py-1 bg-gray-100" >Features</li>
-                <li className="text-xl font-[500] w-full flex justify-center items-center active:text-blue-500 rounded-lg shadow active:scale-90 px-2 py-1 bg-gray-100" >Pricing</li>
-                <li className="text-xl font-[500] w-full flex justify-center items-center active:text-blue-500 rounded-lg shadow active:scale-90 px-2 py-1 bg-gray-100" >Contact</li>
-            </ul>}
-             
+        {/* Desktop Navigation */}
+        <div className="hidden items-center gap-9 lg:flex">
+          {navLinks.map((link) => (
+            <Link
+              key={link.name}
+              href={link.href}
+              className="text-[15px] font-semibold text-slate-600 transition-colors duration-200 hover:text-blue-600"
+            >
+              {link.name}
+            </Link>
+          ))}
+        </div>
 
+        {/* Desktop CTA */}
+        <button
+          type="button"
+          onClick={handleGetStarted}
+          className="hidden items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-5 py-3 text-sm font-semibold text-white shadow-md shadow-blue-500/20 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-blue-500/30 active:scale-95 lg:flex"
+        >
+          Get Started - Free
+          <ArrowRight size={16} />
+        </button>
 
-             <span  className="flex items-center gap-2 cursor-default">
-            <Image src="/logo.png" alt="Logo" width={50} height={50}  />
-            <h1 className="text-2xl font-bold">TaskFlow</h1>
-        </span>
-        <span className='absolute right-5 '>
-            <button  type="button" className="text-white cursor-pointer active:scale-95 bg-gradient-to-br from-blue-500 to-purple-600 hover:bg-gradient-to-bl  font-medium rounded-xl text-sm px-4 py-2.5 text-center leading-5">Go</button>
+        {/* Mobile Menu Button */}
+        <button
+          type="button"
+          onClick={() => setMenuDisplay((prev) => !prev)}
+          aria-label={menuDisplay ? "Close menu" : "Open menu"}
+          aria-expanded={menuDisplay}
+          aria-controls="mobile-navigation"
+          className="flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-800 transition-all hover:bg-blue-50 hover:text-blue-600 active:scale-95 lg:hidden"
+        >
+          {menuDisplay ? (
+            <X size={23} />
+          ) : (
+            <Menu size={23} />
+          )}
+        </button>
 
-        </span>
-        </nav>
+        {/* Mobile Dropdown */}
+        <div
+          id="mobile-navigation"
+          className={`absolute left-0 right-0 top-[calc(100%+10px)] origin-top rounded-2xl border border-slate-200/80 bg-white p-3 shadow-xl shadow-slate-900/10 transition-all duration-200 lg:hidden ${
+            menuDisplay
+              ? "visible translate-y-0 scale-100 opacity-100"
+              : "invisible -translate-y-2 scale-[0.98] opacity-0 pointer-events-none"
+          }`}
+        >
+          <div className="flex flex-col gap-1">
+            {navLinks.map((link) => (
+              <Link
+                key={link.name}
+                href={link.href}
+                onClick={closeMenu}
+                className="rounded-xl px-4 py-3 text-base font-semibold text-slate-700 transition-colors hover:bg-blue-50 hover:text-blue-600 active:scale-[0.98]"
+              >
+                {link.name}
+              </Link>
+            ))}
+          </div>
 
+          <div className="my-3 border-t border-slate-100" />
 
-        
-
-
-
-
-
-    <nav className=" hidden lg:flex items-center justify-around p-3 bg-white text-slate-800 top-5 w-full shadow-lg rounded-lg absolute z-20">
-        <span className="flex items-center gap-2 cursor-default">
-            <Image src="/logo.png" alt="Logo" width={50} height={50}  />
-            <h1 className="text-2xl font-bold">TaskFlow</h1>
-        </span>
-        <span>
-            <ul className="flex items-center gap-10">
-                <li onClick={() => router.push("/dashboard")} className="hover:text-blue-500 cursor-pointer text-xl font-[500]">Home</li>
-                <li className="hover:text-blue-500 cursor-pointer text-xl font-[500]">Features</li>
-                <li className="hover:text-blue-500 cursor-pointer text-xl font-[500]">Pricing</li>
-                <li className="hover:text-blue-500 cursor-pointer text-xl font-[500]">Contact</li>
-            </ul>
-        </span>
-        <span>
-            <button type="button" className="text-white cursor-pointer active:scale-95 bg-gradient-to-br from-blue-500 to-purple-600 hover:bg-gradient-to-bl  font-medium rounded-xl text-sm px-4 py-2.5 text-center leading-5">Get Started - Free</button>
-
-        </span>
-    </nav>
+          <button
+            type="button"
+            onClick={handleGetStarted}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-4 py-3.5 text-base font-semibold text-white shadow-md shadow-blue-500/20 transition-all hover:shadow-lg active:scale-[0.98]"
+          >
+            Get Started - Free
+            <ArrowRight size={18} />
+          </button>
+        </div>
+      </nav>
     </header>
-  )
-}
+  );
+};
 
-export default Navbar
+export default Navbar;

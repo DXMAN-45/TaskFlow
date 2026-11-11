@@ -1,160 +1,247 @@
+
 "use client";
 
 import { useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
-import React from 'react'
-import Image from 'next/image'
-import Link from 'next/link'
+import React from "react";
+import Image from "next/image";
+import Link from "next/link";
+
+const navigation = [
+  {
+    name: "Overview",
+    href: "/dashboard",
+    key: "overview",
+    icon: "/sidebar/overview.png",
+  },
+  {
+    name: "My tasks",
+    href: "/tasks",
+    key: "tasks",
+    icon: "/sidebar/tasks.png",
+  },
+  {
+    name: "Team",
+    href: "/team",
+    key: "team",
+    icon: "/sidebar/teams.png",
+  },
+  {
+    name: "Projects",
+    href: "/projects",
+    key: "projects",
+    icon: "/sidebar/projects.png",
+  },
+];
 
 const Sidebar = ({ active }) => {
-    const router = useRouter();
-    const { data: session } = useSession();
+  const router = useRouter();
+  const { data: session } = useSession();
 
-    const handleSignOut = async () => {
-        await signOut({
-            callbackUrl: "/login",
-        });
-    };
+  const handleSignOut = async () => {
+    await signOut({
+      callbackUrl: "/login",
+    });
+  };
 
-    return (
+  const userName = session?.user?.name || "User";
 
-        <>
+  const initials = userName
+    .trim()
+    .split(/\s+/)
+    .map((word) => word[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
 
+  return (
+    <aside className="sticky top-0 hidden h-screen w-[250px] shrink-0 flex-col justify-between border-r border-slate-800 bg-[#0F172A] p-4 text-white lg:flex xl:w-[270px]">
 
-            <div className='h-screen w-[15vw] border bg-slate-900 p-2 lg:flex flex-col justify-between hidden'>
-                <section>
+      {/* Top Section */}
+      <div>
 
-                    <div className="logo pt-2">
-                        <span onClick={() => router.push("/")} className="flex items-center gap-2 cursor-default">
-                            <Image src="/logo.png" alt="Logo" width={50} height={50} />
-                            <h1 className="text-2xl text-slate-200 font-bold">TaskFlow</h1>
-                        </span>
-                    </div>
+        {/* Logo */}
+        <Link
+          href="/"
+          className="flex items-center gap-3 rounded-xl px-2 py-3 transition-colors hover:bg-white/5"
+        >
+          <Image
+            src="/icon.png"
+            alt="TaskFlow logo"
+            width={46}
+            height={46}
+            priority
+            className="h-10 w-10 object-contain"
+          />
 
+          <span className="text-2xl font-extrabold tracking-tight">
+            Task<span className="text-cyan-400">Flow</span>
+          </span>
+        </Link>
 
+        {/* Workspace Label */}
+        <div className="mb-3 mt-10 px-3">
+          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">
+            Workspace
+          </p>
+        </div>
 
-                    <div className="sidelists w-full flex flex-col mt-5">
-                        <ul className='flex flex-col justify-center items-center gap-3'>
-                            <span onClick={() => router.push("/dashboard")} className={`text-slate-200 text-lg flex items-center w-full pl-3 py-1 ${active === "overview" ? "bg-slate-800" : ""} rounded-lg gap-3 cursor-pointer active:scale-95`}>
-                                <Image src="/sidebar/overview.png" alt="overview" width={20} height={20} className='invert' />Overview
-                            </span>
+        {/* Navigation */}
+        <nav aria-label="Dashboard navigation">
+          <ul className="flex flex-col gap-2">
 
+            {navigation.map((item) => {
+              const isActive = active === item.key;
 
-                            <span onClick={() => router.push("/tasks")} className={`text-slate-200 text-lg flex items-center w-full pl-3 py-1 ${active === "tasks" ? "bg-slate-800" : ""} rounded-lg gap-3 cursor-pointer active:scale-95`}>
-                                <Image src="/sidebar/tasks.png" alt="tasks" width={20} height={20} className='invert' />My tasks
-                            </span>
+              return (
+                <li key={item.key}>
+                  <Link
+                    href={item.href}
+                    aria-current={isActive ? "page" : undefined}
+                    className={`group relative flex items-center gap-3 overflow-hidden rounded-xl px-3 py-3 text-sm font-semibold transition-all duration-200 ${
+                      isActive
+                        ? "bg-gradient-to-r from-blue-600/25 to-cyan-500/10 text-white shadow-inner shadow-blue-500/10"
+                        : "text-slate-400 hover:bg-white/5 hover:text-white"
+                    }`}
+                  >
 
+                    {/* Active Indicator */}
+                    {isActive && (
+                      <span className="absolute bottom-2 left-0 top-2 w-1 rounded-r-full bg-cyan-400" />
+                    )}
 
+                    <span
+                      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors ${
+                        isActive
+                          ? "bg-blue-500/20"
+                          : "bg-white/5 group-hover:bg-white/10"
+                      }`}
+                    >
+                      <Image
+                        src={item.icon}
+                        alt=""
+                        width={21}
+                        height={21}
+                        className={`object-contain transition-all ${
+                          isActive
+                            ? "invert"
+                            : "invert opacity-60 group-hover:opacity-100"
+                        }`}
+                      />
+                    </span>
 
-                            <span onClick={() => router.push("/team")} className={`text-slate-200 text-lg flex items-center w-full pl-3 py-1 ${active === "team" ? "bg-slate-800" : ""} rounded-lg gap-3 cursor-pointer active:scale-95`}>
-                                <Image src="/sidebar/teams.png" alt="teams" width={20} height={20} className='invert' />Team
-                            </span>
+                    <span>{item.name}</span>
 
+                    {isActive && (
+                      <span className="ml-auto h-2 w-2 rounded-full bg-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.7)]" />
+                    )}
 
+                  </Link>
+                </li>
+              );
+            })}
 
-                            <span onClick={() => router.push("/projects")} className={`text-slate-200 text-lg flex items-center w-full pl-3 py-1 ${active === "projects" ? "bg-slate-800" : ""} rounded-lg gap-3 cursor-pointer active:scale-95`}>
-                                <Image src="/sidebar/projects.png" alt="projects" width={20} height={20} className='invert' />Projects
-                            </span>
+          </ul>
+        </nav>
 
+      </div>
 
+      {/* Bottom Section */}
+      <div className="flex flex-col gap-4">
 
+        {/* User Profile */}
+        <div className="group relative rounded-2xl border border-white/10 bg-white/[0.04] p-3 transition-colors hover:bg-white/[0.07]">
 
+          <div className="flex items-center gap-3">
 
+            {/* Profile Image / Initials */}
+            {session?.user?.image ? (
+              <Image
+                src={session.user.image}
+                alt="Profile"
+                width={42}
+                height={42}
+                className="h-10 w-10 shrink-0 rounded-full border border-white/10 object-cover"
+                unoptimized
+              />
+            ) : (
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 text-sm font-bold text-white shadow-md">
+                {initials}
+              </div>
+            )}
 
-                        </ul>
-                    </div>
+            {/* User Details */}
+            <div className="min-w-0 flex-1">
 
+              <h3 className="truncate text-sm font-bold text-slate-100">
+                {userName}
+              </h3>
 
-                </section>
-
-
-
-                <section>
-
-
-                    <div className="profile flex p-1 justify-between items-center my-4">
-                        <div className="profilepic flex gap-2 cursor-default">
-                            {session?.user?.image ? (
-                                <Image
-                                    src={session.user.image}
-                                    alt="Profile"
-                                    width={40}
-                                    height={40}
-                                    className="h-10 w-10 rounded-full object-cover"
-                                    unoptimized
-                                />
-                            ) : (
-                                <div className="h-10 w-10 rounded-full bg-indigo-600 text-white flex items-center justify-center font-semibold text-sm shrink-0">
-                                    {(session?.user?.name || "User")
-                                        .trim()
-                                        .split(/\s+/)
-                                        .map((word) => word[0])
-                                        .join("")
-                                        .slice(0, 2)
-                                        .toUpperCase()}
-                                </div>
-                            )}
-                        <div className="profilename relative min-w-0 flex-1 text-slate-100 text-sm group">
-    <h3 className="truncate whitespace-nowrap cursor-default w-3/4">
-        {session?.user?.name || "User"}
-    </h3>
-
-    <p className="text-xs truncate whitespace-nowrap cursor-default w-3/4">TaskFlow Member</p>
-
-    <div
-        className="absolute left-0 bottom-full mb-2
-        invisible opacity-0 group-hover:visible group-hover:opacity-100
-        transition-opacity duration-200
-        bg-slate-800 text-white text-xs rounded-md
-        px-3 py-2 shadow-lg whitespace-normal break-words
-        w-max max-w-56 z-50 pointer-events-none"
-    >
-        {session?.user?.name || "User"}
-        <div className="text-xs">TaskFlow Member</div>
-    </div>
-</div>
-
-                        </div>
-                        <div className="profilesetting cursor-pointer">
-                            <Image src="/sidebar/setting.png" alt="setting" width={25} height={25} className='invert' />
-                        </div>
-                    </div>
-
-
-
-                    <div className="exit border-t-2 border-slate-500 py-2 flex justify-end">
-                        <span className='h-full w-[10%] '>
-                            <button
-                                type="button"
-                                onClick={handleSignOut}
-                                title="Sign out"
-                                aria-label="Sign out"
-                                className="cursor-pointer"
-                            >
-                                <Image
-                                    src="/sidebar/exit.png"
-                                    alt="Sign out"
-                                    width={15}
-                                    height={15}
-                                    className="invert"
-                                />
-                            </button> </span>
-                    </div>
-
-
-
-                </section>
-
-
-
-
-
+              <p className="mt-0.5 text-xs text-slate-400">
+                TaskFlow Member
+              </p>
 
             </div>
 
-        </>
+            {/* Settings */}
+            <Link
+              href="/settings"
+              aria-label="Settings"
+              title="Settings"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-all hover:bg-white/10 hover:text-cyan-400 active:scale-95"
+            >
+              <Image
+                src="/sidebar/setting.png"
+                alt=""
+                width={21}
+                height={21}
+                className="object-contain invert opacity-70 transition-opacity hover:opacity-100"
+              />
+            </Link>
 
-    )
-}
+          </div>
 
-export default Sidebar
+          {/* Hover Tooltip */}
+          <div className="pointer-events-none absolute bottom-full left-2 z-50 mb-2 hidden max-w-[230px] break-words rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-white opacity-0 shadow-xl transition-opacity duration-200 group-hover:opacity-100 xl:block">
+            {userName}
+            <p className="mt-1 text-slate-400">TaskFlow Member</p>
+          </div>
+
+        </div>
+
+        {/* Sign Out */}
+        <div className="border-t border-slate-700 pt-3">
+
+          <button
+            type="button"
+            onClick={handleSignOut}
+            className="group flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-slate-400 transition-all duration-200 hover:bg-red-500/10 hover:text-red-400 active:scale-[0.98]"
+          >
+
+            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/5 transition-colors group-hover:bg-red-500/10">
+              <Image
+                src="/sidebar/exit.png"
+                alt=""
+                width={19}
+                height={19}
+                className="object-contain invert opacity-60 transition-opacity group-hover:opacity-100"
+              />
+            </span>
+
+            Sign out
+
+          </button>
+
+          <p className="mt-3 text-center text-[10px] font-medium tracking-wide text-slate-600">
+            TASKFLOW · WORK SMARTER
+          </p>
+
+        </div>
+
+      </div>
+
+    </aside>
+  );
+};
+
+export default Sidebar;
