@@ -8,9 +8,7 @@ import {
   FolderKanban,
   CheckCircle2,
   Clock3,
-  AlertCircle,
   CalendarDays,
-  Users,
   MoreHorizontal,
   X,
   ArrowUpRight,
@@ -21,7 +19,6 @@ import {
   Crown,
   BriefcaseBusiness,
   Target,
-  CircleDot,
   Flag,
   Activity,
   Trash2,
@@ -40,9 +37,29 @@ const initialProjects = [
     category: "Product Development",
     status: "In progress",
     priority: "High",
-    progress: 72,
-    tasks: 18,
-    completed: 13,
+    progress: 0,
+    tasks: [
+      {
+        id: "1-1",
+        title: "Redesign user profile",
+        description: "Update the profile layout and improve the user experience.",
+        project: "TaskFlow Website",
+        assignee: "Riya Sharma",
+        priority: "High",
+        status: "In progress",
+        dueDate: "2026-11-14",
+      },
+      {
+        id: "1-2",
+        title: "Add authentication",
+        description: "Add the authentication system for GitHub.",
+        project: "TaskFlow Website",
+        assignee: "Mandeep Singh",
+        priority: "High",
+        status: "To do",
+        dueDate: "2026-11-16",
+      },
+    ],
     members: ["MS", "RS", "AM"],
     memberNames: ["Mandeep Singh", "Riya Sharma", "Alex Morgan"],
     owner: "Mandeep Singh",
@@ -53,14 +70,15 @@ const initialProjects = [
   {
     id: 2,
     name: "Mobile Experience",
-    description:
-      "Improving navigation, responsive layouts, and the mobile experience.",
+    description: "Improving navigation, responsive layouts, and the mobile experience.",
     category: "Design & UX",
     status: "In progress",
     priority: "High",
-    progress: 48,
-    tasks: 12,
-    completed: 6,
+    tasks: [
+      { id: "2-1", title: "Fix mobile sidebar", description: "Resolve the sidebar layout on small screens.", project: "Mobile Experience", assignee: "Alex Morgan", priority: "High", status: "In progress", dueDate: "2026-11-14" },
+      { id: "2-2", title: "Test responsive dashboard", description: "Check the dashboard on common mobile widths.", project: "Mobile Experience", assignee: "Mandeep Singh", priority: "Medium", status: "To do", dueDate: "2026-11-19" },
+      { id: "2-3", title: "Update navigation icons", description: "Polish the icons used in mobile navigation.", project: "Mobile Experience", assignee: "Alex Morgan", priority: "Low", status: "Completed", dueDate: "2026-11-08" },
+    ],
     members: ["MS", "AM"],
     memberNames: ["Mandeep Singh", "Alex Morgan"],
     owner: "Mandeep Singh",
@@ -71,14 +89,15 @@ const initialProjects = [
   {
     id: 3,
     name: "Team Management",
-    description:
-      "Creating a better way to manage members, invitations, and permissions.",
+    description: "Creating a better way to manage members, invitations, and permissions.",
     category: "Operations",
     status: "Planning",
     priority: "Medium",
-    progress: 18,
-    tasks: 11,
-    completed: 2,
+    tasks: [
+      { id: "3-1", title: "Define member roles", description: "Agree on the permissions available to each role.", project: "Team Management", assignee: "Riya Sharma", priority: "High", status: "In progress", dueDate: "2026-11-15" },
+      { id: "3-2", title: "Build invitation flow", description: "Create the project invitation experience.", project: "Team Management", assignee: "Mandeep Singh", priority: "Medium", status: "To do", dueDate: "2026-11-20" },
+      { id: "3-3", title: "Review access permissions", description: "Verify member access rules.", project: "Team Management", assignee: "Riya Sharma", priority: "High", status: "Completed", dueDate: "2026-11-09" },
+    ],
     members: ["MS", "RS"],
     memberNames: ["Mandeep Singh", "Riya Sharma"],
     owner: "Riya Sharma",
@@ -89,14 +108,15 @@ const initialProjects = [
   {
     id: 4,
     name: "Documentation Hub",
-    description:
-      "Organizing product documentation, setup guides, and team resources.",
+    description: "Organizing product documentation, setup guides, and team resources.",
     category: "Documentation",
     status: "In progress",
     priority: "Low",
-    progress: 85,
-    tasks: 7,
-    completed: 6,
+    tasks: [
+      { id: "4-1", title: "Write getting started guide", description: "Document the first steps for new users.", project: "Documentation Hub", assignee: "Sophia Williams", priority: "High", status: "In progress", dueDate: "2026-11-14" },
+      { id: "4-2", title: "Organize API references", description: "Group API documentation by feature.", project: "Documentation Hub", assignee: "Mandeep Singh", priority: "Medium", status: "To do", dueDate: "2026-11-18" },
+      { id: "4-3", title: "Review setup instructions", description: "Check setup steps for accuracy.", project: "Documentation Hub", assignee: "Sophia Williams", priority: "Low", status: "Completed", dueDate: "2026-11-10" },
+    ],
     members: ["MS", "SW"],
     memberNames: ["Mandeep Singh", "Sophia Williams"],
     owner: "Mandeep Singh",
@@ -107,14 +127,15 @@ const initialProjects = [
   {
     id: 5,
     name: "Marketing Campaign",
-    description:
-      "Planning product launch content and preparing promotional material.",
+    description: "Planning product launch content and preparing promotional material.",
     category: "Marketing",
     status: "Completed",
     priority: "Medium",
-    progress: 100,
-    tasks: 9,
-    completed: 9,
+    tasks: [
+      { id: "5-1", title: "Prepare launch announcements", description: "Write the product launch announcement.", project: "Marketing Campaign", assignee: "Riya Sharma", priority: "High", status: "Completed", dueDate: "2026-10-28" },
+      { id: "5-2", title: "Create social media assets", description: "Prepare launch graphics and social content.", project: "Marketing Campaign", assignee: "Sophia Williams", priority: "Medium", status: "Completed", dueDate: "2026-10-25" },
+      { id: "5-3", title: "Review campaign results", description: "Review the campaign deliverables.", project: "Marketing Campaign", assignee: "Daniel Cooper", priority: "Low", status: "Completed", dueDate: "2026-10-30" },
+    ],
     members: ["RS", "SW", "DC"],
     memberNames: ["Riya Sharma", "Sophia Williams", "Daniel Cooper"],
     owner: "Riya Sharma",
@@ -125,14 +146,15 @@ const initialProjects = [
   {
     id: 6,
     name: "API Integration",
-    description:
-      "Connecting backend services and preparing stable API integrations.",
+    description: "Connecting backend services and preparing stable API integrations.",
     category: "Development",
     status: "On hold",
     priority: "High",
-    progress: 35,
-    tasks: 14,
-    completed: 5,
+    tasks: [
+      { id: "6-1", title: "Connect authentication API", description: "Connect the authentication service.", project: "API Integration", assignee: "Mandeep Singh", priority: "High", status: "In progress", dueDate: "2026-11-17" },
+      { id: "6-2", title: "Handle API error states", description: "Add clear error handling for failed requests.", project: "API Integration", assignee: "Alex Morgan", priority: "High", status: "To do", dueDate: "2026-11-21" },
+      { id: "6-3", title: "Test integration endpoints", description: "Verify API endpoints and responses.", project: "API Integration", assignee: "Daniel Cooper", priority: "Medium", status: "In progress", dueDate: "2026-11-19" },
+    ],
     members: ["MS", "AM", "DC"],
     memberNames: ["Mandeep Singh", "Alex Morgan", "Daniel Cooper"],
     owner: "Mandeep Singh",
@@ -141,6 +163,13 @@ const initialProjects = [
     createdAt: "2026-10-05",
   },
 ];
+
+const taskStatusStyles = {
+  "To do": "bg-slate-100 text-slate-600",
+  "In progress": "bg-blue-50 text-blue-700",
+  Completed: "bg-emerald-50 text-emerald-700",
+  Overdue: "bg-red-50 text-red-700",
+};
 
 const projectColors = {
   indigo: {
@@ -222,6 +251,23 @@ function formatDate(date) {
     day: "numeric",
     year: "numeric",
   });
+}
+
+function getProjectTasks(project) {
+  return Array.isArray(project?.tasks) ? project.tasks : [];
+}
+
+function getCompletedTaskCount(project) {
+  return getProjectTasks(project).filter(
+    (task) => task.status?.trim().toLowerCase() === "completed"
+  ).length;
+}
+
+function getProjectProgress(project) {
+  const tasks = getProjectTasks(project);
+  return tasks.length
+    ? Math.round((getCompletedTaskCount(project) / tasks.length) * 100)
+    : 0;
 }
 
 function getDaysRemaining(date) {
@@ -412,19 +458,19 @@ function ProjectCard({ project, onOpen, onMenu, menuOpen, onEdit, onArchive, onD
             Project progress
           </span>
           <span className="text-xs font-bold tabular-nums text-slate-800">
-            {project.progress}%
+            {getProjectProgress(project)}%
           </span>
         </div>
-        <ProgressBar value={project.progress} color={project.color} />
+        <ProgressBar value={getProjectProgress(project)} color={project.color} />
       </div>
 
       <div className="mt-5 grid grid-cols-2 gap-3 border-b border-slate-100 pb-5">
         <div>
           <p className="text-xs text-slate-400">Tasks completed</p>
           <p className="mt-1 text-sm font-bold text-slate-800">
-            {project.completed}
+            {getCompletedTaskCount(project)}
             <span className="ml-1 font-medium text-slate-400">
-              / {project.tasks}
+              / {getProjectTasks(project).length}
             </span>
           </p>
         </div>
@@ -496,12 +542,12 @@ export default function ProjectsPage() {
   ).length;
 
   const totalTasks = projects.reduce(
-    (sum, project) => sum + project.tasks,
+    (sum, project) => sum + getProjectTasks(project).length,
     0
   );
 
   const completedTasks = projects.reduce(
-    (sum, project) => sum + project.completed,
+    (sum, project) => sum + getCompletedTaskCount(project),
     0
   );
 
@@ -598,8 +644,7 @@ export default function ProjectsPage() {
         id: Date.now(),
         name,
         progress: 0,
-        tasks: 0,
-        completed: 0,
+        tasks: [],
         members: ["MS"],
         memberNames: ["Mandeep Singh"],
         createdAt: new Date().toISOString().slice(0, 10),
@@ -661,45 +706,7 @@ export default function ProjectsPage() {
     notify("Project deleted from demo data.");
   };
 
-  const setProjectProgress = (project, progress) => {
-    const nextProgress = Math.max(0, Math.min(100, Number(progress) || 0));
 
-    setProjects((previous) =>
-      previous.map((item) =>
-        item.id === project.id
-          ? {
-              ...item,
-              progress: nextProgress,
-              completed: Math.round((item.tasks * nextProgress) / 100),
-              status:
-                nextProgress === 100
-                  ? "Completed"
-                  : nextProgress === 0
-                  ? "Planning"
-                  : "In progress",
-            }
-          : item
-      )
-    );
-
-    setSelectedProject((previous) =>
-      previous?.id === project.id
-        ? {
-            ...previous,
-            progress: nextProgress,
-            completed: Math.round((previous.tasks * nextProgress) / 100),
-            status:
-              nextProgress === 100
-                ? "Completed"
-                : nextProgress === 0
-                ? "Planning"
-                : "In progress",
-          }
-        : previous
-    );
-
-    notify("Project progress updated.");
-  };
 
   return (
     <main
@@ -1112,11 +1119,11 @@ export default function ProjectsPage() {
                           <div className="mb-2 flex items-center justify-between text-xs">
                             <span className="text-slate-400">Progress</span>
                             <span className="font-bold text-slate-700">
-                              {project.progress}%
+                              {getProjectProgress(project)}%
                             </span>
                           </div>
                           <ProgressBar
-                            value={project.progress}
+                            value={getProjectProgress(project)}
                             color={project.color}
                           />
                         </div>
@@ -1124,7 +1131,7 @@ export default function ProjectsPage() {
                         <div className="flex items-center justify-between gap-4 sm:w-40 sm:justify-end">
                           <ProjectAvatars members={project.members} />
                           <span className="text-xs text-slate-400">
-                            {project.completed}/{project.tasks} tasks
+                            {getCompletedTaskCount(project)}/{getProjectTasks(project).length} tasks
                           </span>
                         </div>
 
@@ -1364,150 +1371,190 @@ export default function ProjectsPage() {
         </div>
       )}
 
-      {/* Project details modal */}
+      {/* Project workspace details */}
       {showDetailsModal && selectedProject && (
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-slate-950/50 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-slate-950/50 p-3 backdrop-blur-sm sm:p-5"
           onMouseDown={(event) => {
             if (event.target === event.currentTarget) {
               setShowDetailsModal(false);
             }
           }}
         >
-          <div className="my-auto w-full max-w-xl overflow-hidden rounded-2xl bg-white shadow-2xl">
-            <div className="relative border-b border-slate-100 bg-slate-50 px-5 py-6 sm:px-7">
+          <div className="flex max-h-[94dvh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+            {/* Project header */}
+            <div className="flex items-start justify-between gap-4 border-b border-slate-100 bg-slate-50 px-5 py-5 sm:px-7 sm:py-6">
+              <div className="flex min-w-0 items-start gap-3 sm:gap-4">
+                <div
+                  className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl sm:h-12 sm:w-12 ${(projectColors[selectedProject.color] || projectColors.indigo).icon}`}
+                >
+                  <FolderKanban size={22} />
+                </div>
+                <div className="min-w-0">
+                  <div className="mb-2 flex flex-wrap items-center gap-2">
+                    <StatusBadge status={selectedProject.status} />
+                    <PriorityBadge priority={selectedProject.priority} />
+                  </div>
+                  <h3 className="truncate pr-2 text-lg font-bold text-slate-900 sm:text-xl">
+                    {selectedProject.name}
+                  </h3>
+                  <p className="mt-1 max-w-2xl text-sm leading-5 text-slate-500">
+                    {selectedProject.description}
+                  </p>
+                </div>
+              </div>
+
               <button
                 type="button"
                 onClick={() => setShowDetailsModal(false)}
-                aria-label="Close project details"
-                className="absolute right-4 top-4 rounded-lg p-2 text-slate-400 hover:bg-white hover:text-slate-700"
+                aria-label="Close project"
+                className="shrink-0 rounded-lg p-2 text-slate-400 transition hover:bg-white hover:text-slate-700"
               >
                 <X size={19} />
               </button>
-
-              <div
-                className={`mb-4 flex h-12 w-12 items-center justify-center rounded-xl ${
-                  (projectColors[selectedProject.color] ||
-                    projectColors.indigo).icon
-                }`}
-              >
-                <FolderKanban size={22} />
-              </div>
-
-              <div className="mb-2 flex flex-wrap items-center gap-2">
-                <StatusBadge status={selectedProject.status} />
-                <PriorityBadge priority={selectedProject.priority} />
-              </div>
-
-              <h3 className="pr-8 text-xl font-bold text-slate-900">
-                {selectedProject.name}
-              </h3>
-              <p className="mt-2 text-sm leading-6 text-slate-500">
-                {selectedProject.description}
-              </p>
             </div>
 
-            <div className="p-5 sm:p-7">
-              <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
-                <DetailMetric
-                  label="Progress"
-                  value={`${selectedProject.progress}%`}
-                />
-                <DetailMetric
-                  label="Tasks completed"
-                  value={`${selectedProject.completed}/${selectedProject.tasks}`}
-                />
-                <DetailMetric
-                  label="Team members"
-                  value={selectedProject.members.length}
-                />
-              </div>
-
-              <div className="mb-6">
-                <div className="mb-2 flex items-center justify-between">
-                  <span className="text-sm font-semibold text-slate-700">
-                    Project progress
-                  </span>
-                  <span className="text-sm font-bold text-indigo-600">
-                    {selectedProject.progress}%
-                  </span>
+            <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6 lg:p-7">
+              <div className="mb-6 grid grid-cols-3 gap-3">
+                <div className="rounded-xl border border-slate-100 bg-white p-3 sm:p-4">
+                  <p className="text-[11px] font-medium text-slate-400 sm:text-xs">Total tasks</p>
+                  <p className="mt-1 text-xl font-bold tabular-nums text-slate-900 sm:text-2xl">{getProjectTasks(selectedProject).length}</p>
                 </div>
-                <ProgressBar
-                  value={selectedProject.progress}
-                  color={selectedProject.color}
-                />
-                <p className="mt-2 text-xs text-slate-400">
-                  Adjust the progress here for this demo project.
-                </p>
-                <input
-                  aria-label="Project progress"
-                  type="range"
-                  min="0"
-                  max="100"
-                  step="5"
-                  value={selectedProject.progress}
-                  onChange={(event) =>
-                    setProjectProgress(selectedProject, event.target.value)
-                  }
-                  className="mt-3 w-full accent-indigo-600"
-                />
+                <div className="rounded-xl border border-slate-100 bg-white p-3 sm:p-4">
+                  <p className="text-[11px] font-medium text-slate-400 sm:text-xs">Completed</p>
+                  <p className="mt-1 text-xl font-bold tabular-nums text-emerald-600 sm:text-2xl">{getCompletedTaskCount(selectedProject)}</p>
+                </div>
+                <div className="rounded-xl border border-slate-100 bg-white p-3 sm:p-4">
+                  <p className="text-[11px] font-medium text-slate-400 sm:text-xs">Team members</p>
+                  <p className="mt-1 text-xl font-bold tabular-nums text-slate-900 sm:text-2xl">{selectedProject.memberNames.length}</p>
+                </div>
               </div>
 
-              <div className="space-y-4 rounded-xl bg-slate-50 p-4">
-                <DetailLine
-                  icon={<BriefcaseBusiness size={16} />}
-                  label="Category"
-                  value={selectedProject.category}
-                />
-                <DetailLine
-                  icon={<Crown size={16} />}
-                  label="Project owner"
-                  value={selectedProject.owner}
-                />
-                <DetailLine
-                  icon={<CalendarDays size={16} />}
-                  label="Deadline"
-                  value={formatDate(selectedProject.deadline)}
-                />
-              </div>
-
-              <div className="mt-6">
-                <h4 className="mb-3 text-sm font-bold text-slate-800">
-                  Project team
-                </h4>
-
-                <div className="flex flex-wrap gap-2">
-                  {selectedProject.memberNames.map((name) => (
-                    <span
-                      key={name}
-                      className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600"
-                    >
-                      {name}
+              <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1.65fr)_minmax(280px,0.85fr)] xl:gap-6">
+                {/* Tasks */}
+                <section className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                  <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-4 sm:px-5">
+                    <div>
+                      <h4 className="text-base font-bold text-slate-900">Project tasks</h4>
+                      <p className="mt-1 text-xs text-slate-400">Tasks and the people assigned to them</p>
+                    </div>
+                    <span className="shrink-0 rounded-lg bg-slate-100 px-2.5 py-1.5 text-xs font-semibold text-slate-600">
+                      {getProjectTasks(selectedProject).length} tasks
                     </span>
-                  ))}
+                  </div>
+
+                  <div className="divide-y divide-slate-100">
+                    {getProjectTasks(selectedProject).map((task) => (
+                      <div key={task.id} className="px-4 py-4 transition hover:bg-slate-50/70 sm:px-5">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="break-words text-sm font-semibold text-slate-800">{task.title}</p>
+                            {task.description && (
+                              <p className="mt-1 text-xs leading-5 text-slate-500">{task.description}</p>
+                            )}
+                            <div className="mt-2 flex flex-wrap items-center gap-2">
+                              <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${taskStatusStyles[task.status] || taskStatusStyles["To do"]}`}>
+                                {task.status}
+                              </span>
+                              <PriorityBadge priority={task.priority} />
+                            </div>
+                          </div>
+                          <span className="shrink-0 whitespace-nowrap text-[11px] text-slate-400 sm:text-xs">
+                            {formatDate(task.dueDate)}
+                          </span>
+                        </div>
+
+                        <div className="mt-3 flex items-center gap-2">
+                          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-[10px] font-bold text-indigo-700">
+                            {task.assignee.split(" ").map((part) => part[0]).slice(0, 2).join("").toUpperCase()}
+                          </div>
+                          <span className="min-w-0 truncate text-xs font-medium text-slate-600">{task.assignee}</span>
+                          <span className="text-xs text-slate-300">·</span>
+                          <span className="text-xs text-slate-400">Assignee</span>
+                        </div>
+                      </div>
+                    ))}
+                    {getProjectTasks(selectedProject).length === 0 && (
+                      <div className="px-5 py-10 text-center">
+                        <p className="text-sm font-semibold text-slate-700">No tasks yet</p>
+                        <p className="mt-1 text-xs text-slate-400">Tasks added to this project will appear here.</p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="border-t border-slate-100 bg-slate-50/70 px-4 py-3 sm:px-5">
+                    <p className="text-xs text-slate-400">
+                      {getProjectTasks(selectedProject).length} tasks in this project
+                    </p>
+                  </div>
+                </section>
+
+                {/* Project information and members */}
+                <div className="space-y-5">
+                  <section className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
+                    <div className="mb-4 flex items-center justify-between">
+                      <h4 className="text-base font-bold text-slate-900">Project overview</h4>
+                      <Target size={18} className="text-indigo-500" />
+                    </div>
+                    <div className="mb-2 flex items-center justify-between gap-3">
+                      <span className="text-xs font-medium text-slate-500">Progress</span>
+                      <span className="text-sm font-bold tabular-nums text-indigo-600">{getProjectProgress(selectedProject)}%</span>
+                    </div>
+                    <ProgressBar value={getProjectProgress(selectedProject)} color={selectedProject.color} />
+                    <div className="mt-5 space-y-3">
+                      <DetailLine icon={<BriefcaseBusiness size={16} />} label="Category" value={selectedProject.category} />
+                      <DetailLine icon={<Crown size={16} />} label="Project owner" value={selectedProject.owner} />
+                      <DetailLine icon={<CalendarDays size={16} />} label="Deadline" value={formatDate(selectedProject.deadline)} />
+                      <DetailLine icon={<Clock3 size={16} />} label="Created" value={formatDate(selectedProject.createdAt)} />
+                    </div>
+                  </section>
+
+                  <section className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
+                    <div className="mb-4 flex items-center justify-between gap-3">
+                      <div>
+                        <h4 className="text-base font-bold text-slate-900">Project members</h4>
+                        <p className="mt-1 text-xs text-slate-400">People working on this project</p>
+                      </div>
+                      <span className="rounded-lg bg-indigo-50 px-2.5 py-1.5 text-xs font-semibold text-indigo-600">
+                        {selectedProject.memberNames.length} members
+                      </span>
+                    </div>
+
+                    <div className="space-y-3">
+                      {selectedProject.memberNames.map((name, index) => {
+                        const assignedCount = getProjectTasks(selectedProject).filter((task) => task.assignee === name).length;
+                        const isOwner = selectedProject.owner === name;
+                        return (
+                          <div key={name} className="flex items-center gap-3">
+                            <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold ${["bg-indigo-100 text-indigo-700", "bg-purple-100 text-purple-700", "bg-sky-100 text-sky-700", "bg-emerald-100 text-emerald-700"][index % 4]}`}>
+                              {name.split(" ").map((part) => part[0]).slice(0, 2).join("").toUpperCase()}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-sm font-semibold text-slate-800">{name}</p>
+                              <p className="text-xs text-slate-400">{isOwner ? "Project owner" : `${assignedCount} ${assignedCount === 1 ? "task" : "tasks"} assigned`}</p>
+                            </div>
+                            {isOwner && <Crown size={15} className="shrink-0 text-amber-500" />}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </section>
                 </div>
               </div>
 
-              <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
+              <div className="mt-6 flex justify-end border-t border-slate-100 pt-5">
                 <button
                   type="button"
                   onClick={() => {
                     setShowDetailsModal(false);
                     startEdit(selectedProject);
                   }}
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 px-4 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 px-4 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
                 >
                   <Pencil size={15} />
                   Edit project
                 </button>
 
-                <button
-                  type="button"
-                  onClick={() => setShowDetailsModal(false)}
-                  className="h-11 rounded-xl bg-indigo-600 px-6 text-sm font-semibold text-white hover:bg-indigo-700"
-                >
-                  Done
-                </button>
               </div>
             </div>
           </div>

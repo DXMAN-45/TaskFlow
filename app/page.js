@@ -93,14 +93,14 @@ export default function Home() {
                 className="group flex flex-row items-center gap-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-blue-100 hover:shadow-lg hover:shadow-blue-500/5 sm:flex-col sm:items-start sm:p-4"
               >
 
-                <div className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-blue-50 p-2 sm:h-20 sm:w-20">
+                <div className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl p-2 sm:h-20 sm:w-20">
                   <Image
                     src={feature.image}
                     alt={feature.alt}
                     width={100}
                     height={100}
                     unoptimized
-                    className="h-full w-full object-contain transition-transform duration-300 group-hover:scale-110"
+                    className="h-full w-full object-contain transition-transform duration-300 group-hover:scale-110 mix-blend-multiply"
                   />
                 </div>
 

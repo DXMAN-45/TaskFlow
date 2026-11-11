@@ -163,9 +163,8 @@ function StatusBadge({ status }) {
 
   return (
     <span
-      className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${
-        styles[status] || styles["To do"]
-      }`}
+      className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${styles[status] || styles["To do"]
+        }`}
     >
       {status}
     </span>
@@ -181,9 +180,8 @@ function PriorityBadge({ priority }) {
 
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${
-        styles[priority] || styles.Medium
-      }`}
+      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${styles[priority] || styles.Medium
+        }`}
     >
       <Flag size={12} />
       {priority}
@@ -463,15 +461,31 @@ export default function DashboardClient({ user = {} }) {
                 <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-red-500 ring-2 ring-white" />
               </button>
 
+
               {showNotifications && (
-                <div className="absolute right-0 top-12 z-50 w-[290px] rounded-2xl border border-slate-200 bg-white p-4 shadow-xl">
-                  <div className="mb-3 flex items-center justify-between">
-                    <h3 className="font-bold text-slate-900">
-                      Notifications
-                    </h3>
+                <div
+                  className="
+      absolute right-0 top-12 z-50
+      w-[min(320px,calc(100vw-176px))] lg:w-[320px]
+      max-h-[70dvh] overflow-y-auto
+      rounded-2xl border border-slate-200
+      bg-white p-4 shadow-xl
+    "
+                >
+                  <div className="mb-4 flex items-center justify-between">
+                    <div>
+                      <h3 className="font-bold text-slate-900">
+                        Notifications
+                      </h3>
+                      <p className="mt-1 text-xs text-slate-400">
+                        Your latest updates
+                      </p>
+                    </div>
+
                     <button
+                      type="button"
                       onClick={() => setShowNotifications(false)}
-                      className="text-slate-400 hover:text-slate-700"
+                      className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
                       aria-label="Close notifications"
                     >
                       <X size={17} />
@@ -482,9 +496,10 @@ export default function DashboardClient({ user = {} }) {
                     <div className="flex gap-3 rounded-xl bg-indigo-50 p-3">
                       <CheckCircle2
                         size={18}
-                        className="mt-0.5 text-indigo-600"
+                        className="mt-0.5 shrink-0 text-indigo-600"
                       />
-                      <div>
+
+                      <div className="min-w-0">
                         <p className="text-sm font-semibold text-slate-800">
                           Welcome to TaskFlow
                         </p>
@@ -497,9 +512,10 @@ export default function DashboardClient({ user = {} }) {
                     <div className="flex gap-3 rounded-xl bg-slate-50 p-3">
                       <CalendarDays
                         size={18}
-                        className="mt-0.5 text-amber-600"
+                        className="mt-0.5 shrink-0 text-amber-600"
                       />
-                      <div>
+
+                      <div className="min-w-0">
                         <p className="text-sm font-semibold text-slate-800">
                           Upcoming deadlines
                         </p>
@@ -511,6 +527,7 @@ export default function DashboardClient({ user = {} }) {
                   </div>
                 </div>
               )}
+
             </div>
 
             {/* Profile */}
@@ -650,11 +667,10 @@ export default function DashboardClient({ user = {} }) {
                         key={filter}
                         type="button"
                         onClick={() => setActiveFilter(filter)}
-                        className={`shrink-0 rounded-lg px-3 py-2 text-xs font-semibold transition ${
-                          activeFilter === filter
+                        className={`shrink-0 rounded-lg px-3 py-2 text-xs font-semibold transition ${activeFilter === filter
                             ? "bg-indigo-600 text-white"
                             : "bg-slate-50 text-slate-500 hover:bg-slate-100"
-                        }`}
+                          }`}
                       >
                         {filter}
                         {filter === "All Tasks" && (
@@ -689,11 +705,10 @@ export default function DashboardClient({ user = {} }) {
                           <button
                             type="button"
                             onClick={() => toggleTaskStatus(task.id)}
-                            className={`mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition ${
-                              task.status === "Completed"
+                            className={`mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition ${task.status === "Completed"
                                 ? "border-emerald-500 bg-emerald-500 text-white"
                                 : "border-slate-300 text-transparent hover:border-indigo-500"
-                            }`}
+                              }`}
                             aria-label={`Toggle ${task.title}`}
                           >
                             <Check size={12} />
@@ -706,11 +721,10 @@ export default function DashboardClient({ user = {} }) {
                           >
                             <div className="flex flex-wrap items-center gap-2">
                               <p
-                                className={`text-sm font-semibold ${
-                                  task.status === "Completed"
+                                className={`text-sm font-semibold ${task.status === "Completed"
                                     ? "text-slate-400 line-through"
                                     : "text-slate-800"
-                                }`}
+                                  }`}
                               >
                                 {task.title}
                               </p>
@@ -837,9 +851,8 @@ export default function DashboardClient({ user = {} }) {
                     <div
                       className="relative flex h-40 w-40 items-center justify-center rounded-full"
                       style={{
-                        background: `conic-gradient(#4f46e5 ${
-                          completionPercentage * 3.6
-                        }deg, #eef0f6 0deg)`,
+                        background: `conic-gradient(#4f46e5 ${completionPercentage * 3.6
+                          }deg, #eef0f6 0deg)`,
                       }}
                     >
                       <div className="flex h-[126px] w-[126px] flex-col items-center justify-center rounded-full bg-white">
