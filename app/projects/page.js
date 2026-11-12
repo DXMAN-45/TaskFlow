@@ -1,13 +1,12 @@
 
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Search,
   Plus,
   FolderKanban,
   CheckCircle2,
-  Clock3,
   CalendarDays,
   MoreHorizontal,
   X,
@@ -23,146 +22,53 @@ import {
   Activity,
   Trash2,
   Pencil,
+  Clock3,
+  ShieldCheck,
+  UserRound,
 } from "lucide-react";
 
 import Sidebar from "../component/Sidebar";
 import Sidebarmob from "../component/Sidebarmob";
 
-const initialProjects = [
-  {
-    id: 1,
-    name: "TaskFlow Website",
-    description:
-      "Building a clean and intuitive task management experience for teams.",
-    category: "Product Development",
-    status: "In progress",
-    priority: "High",
-    progress: 0,
-    tasks: [
-      {
-        id: "1-1",
-        title: "Redesign user profile",
-        description: "Update the profile layout and improve the user experience.",
-        project: "TaskFlow Website",
-        assignee: "Riya Sharma",
-        priority: "High",
-        status: "In progress",
-        dueDate: "2026-11-14",
-      },
-      {
-        id: "1-2",
-        title: "Add authentication",
-        description: "Add the authentication system for GitHub.",
-        project: "TaskFlow Website",
-        assignee: "Mandeep Singh",
-        priority: "High",
-        status: "To do",
-        dueDate: "2026-11-16",
-      },
-    ],
-    members: ["MS", "RS", "AM"],
-    memberNames: ["Mandeep Singh", "Riya Sharma", "Alex Morgan"],
-    owner: "Mandeep Singh",
-    color: "indigo",
-    deadline: "2026-11-28",
-    createdAt: "2026-09-12",
+const projectColors = {
+  indigo: {
+    icon: "bg-indigo-50 text-indigo-600",
+    bar: "bg-indigo-600",
+    accent: "bg-indigo-500",
   },
-  {
-    id: 2,
-    name: "Mobile Experience",
-    description: "Improving navigation, responsive layouts, and the mobile experience.",
-    category: "Design & UX",
-    status: "In progress",
-    priority: "High",
-    tasks: [
-      { id: "2-1", title: "Fix mobile sidebar", description: "Resolve the sidebar layout on small screens.", project: "Mobile Experience", assignee: "Alex Morgan", priority: "High", status: "In progress", dueDate: "2026-11-14" },
-      { id: "2-2", title: "Test responsive dashboard", description: "Check the dashboard on common mobile widths.", project: "Mobile Experience", assignee: "Mandeep Singh", priority: "Medium", status: "To do", dueDate: "2026-11-19" },
-      { id: "2-3", title: "Update navigation icons", description: "Polish the icons used in mobile navigation.", project: "Mobile Experience", assignee: "Alex Morgan", priority: "Low", status: "Completed", dueDate: "2026-11-08" },
-    ],
-    members: ["MS", "AM"],
-    memberNames: ["Mandeep Singh", "Alex Morgan"],
-    owner: "Mandeep Singh",
-    color: "violet",
-    deadline: "2026-12-05",
-    createdAt: "2026-10-01",
+  violet: {
+    icon: "bg-violet-50 text-violet-600",
+    bar: "bg-violet-600",
+    accent: "bg-violet-500",
   },
-  {
-    id: 3,
-    name: "Team Management",
-    description: "Creating a better way to manage members, invitations, and permissions.",
-    category: "Operations",
-    status: "Planning",
-    priority: "Medium",
-    tasks: [
-      { id: "3-1", title: "Define member roles", description: "Agree on the permissions available to each role.", project: "Team Management", assignee: "Riya Sharma", priority: "High", status: "In progress", dueDate: "2026-11-15" },
-      { id: "3-2", title: "Build invitation flow", description: "Create the project invitation experience.", project: "Team Management", assignee: "Mandeep Singh", priority: "Medium", status: "To do", dueDate: "2026-11-20" },
-      { id: "3-3", title: "Review access permissions", description: "Verify member access rules.", project: "Team Management", assignee: "Riya Sharma", priority: "High", status: "Completed", dueDate: "2026-11-09" },
-    ],
-    members: ["MS", "RS"],
-    memberNames: ["Mandeep Singh", "Riya Sharma"],
-    owner: "Riya Sharma",
-    color: "sky",
-    deadline: "2026-12-15",
-    createdAt: "2026-10-18",
+  sky: {
+    icon: "bg-sky-50 text-sky-600",
+    bar: "bg-sky-600",
+    accent: "bg-sky-500",
   },
-  {
-    id: 4,
-    name: "Documentation Hub",
-    description: "Organizing product documentation, setup guides, and team resources.",
-    category: "Documentation",
-    status: "In progress",
-    priority: "Low",
-    tasks: [
-      { id: "4-1", title: "Write getting started guide", description: "Document the first steps for new users.", project: "Documentation Hub", assignee: "Sophia Williams", priority: "High", status: "In progress", dueDate: "2026-11-14" },
-      { id: "4-2", title: "Organize API references", description: "Group API documentation by feature.", project: "Documentation Hub", assignee: "Mandeep Singh", priority: "Medium", status: "To do", dueDate: "2026-11-18" },
-      { id: "4-3", title: "Review setup instructions", description: "Check setup steps for accuracy.", project: "Documentation Hub", assignee: "Sophia Williams", priority: "Low", status: "Completed", dueDate: "2026-11-10" },
-    ],
-    members: ["MS", "SW"],
-    memberNames: ["Mandeep Singh", "Sophia Williams"],
-    owner: "Mandeep Singh",
-    color: "emerald",
-    deadline: "2026-11-22",
-    createdAt: "2026-09-20",
+  emerald: {
+    icon: "bg-emerald-50 text-emerald-600",
+    bar: "bg-emerald-600",
+    accent: "bg-emerald-500",
   },
-  {
-    id: 5,
-    name: "Marketing Campaign",
-    description: "Planning product launch content and preparing promotional material.",
-    category: "Marketing",
-    status: "Completed",
-    priority: "Medium",
-    tasks: [
-      { id: "5-1", title: "Prepare launch announcements", description: "Write the product launch announcement.", project: "Marketing Campaign", assignee: "Riya Sharma", priority: "High", status: "Completed", dueDate: "2026-10-28" },
-      { id: "5-2", title: "Create social media assets", description: "Prepare launch graphics and social content.", project: "Marketing Campaign", assignee: "Sophia Williams", priority: "Medium", status: "Completed", dueDate: "2026-10-25" },
-      { id: "5-3", title: "Review campaign results", description: "Review the campaign deliverables.", project: "Marketing Campaign", assignee: "Daniel Cooper", priority: "Low", status: "Completed", dueDate: "2026-10-30" },
-    ],
-    members: ["RS", "SW", "DC"],
-    memberNames: ["Riya Sharma", "Sophia Williams", "Daniel Cooper"],
-    owner: "Riya Sharma",
-    color: "rose",
-    deadline: "2026-10-30",
-    createdAt: "2026-09-01",
+  rose: {
+    icon: "bg-rose-50 text-rose-600",
+    bar: "bg-rose-600",
+    accent: "bg-rose-500",
   },
-  {
-    id: 6,
-    name: "API Integration",
-    description: "Connecting backend services and preparing stable API integrations.",
-    category: "Development",
-    status: "On hold",
-    priority: "High",
-    tasks: [
-      { id: "6-1", title: "Connect authentication API", description: "Connect the authentication service.", project: "API Integration", assignee: "Mandeep Singh", priority: "High", status: "In progress", dueDate: "2026-11-17" },
-      { id: "6-2", title: "Handle API error states", description: "Add clear error handling for failed requests.", project: "API Integration", assignee: "Alex Morgan", priority: "High", status: "To do", dueDate: "2026-11-21" },
-      { id: "6-3", title: "Test integration endpoints", description: "Verify API endpoints and responses.", project: "API Integration", assignee: "Daniel Cooper", priority: "Medium", status: "In progress", dueDate: "2026-11-19" },
-    ],
-    members: ["MS", "AM", "DC"],
-    memberNames: ["Mandeep Singh", "Alex Morgan", "Daniel Cooper"],
-    owner: "Mandeep Singh",
-    color: "amber",
-    deadline: "2026-12-20",
-    createdAt: "2026-10-05",
+  amber: {
+    icon: "bg-amber-50 text-amber-600",
+    bar: "bg-amber-600",
+    accent: "bg-amber-500",
   },
-];
+};
+
+const statusStyles = {
+  "Not started": "bg-slate-100 text-slate-600",
+  "In progress": "bg-blue-50 text-blue-700",
+  Completed: "bg-emerald-50 text-emerald-700",
+  Archived: "bg-slate-100 text-slate-500",
+};
 
 const taskStatusStyles = {
   "To do": "bg-slate-100 text-slate-600",
@@ -171,54 +77,8 @@ const taskStatusStyles = {
   Overdue: "bg-red-50 text-red-700",
 };
 
-const projectColors = {
-  indigo: {
-    icon: "bg-indigo-50 text-indigo-600",
-    bar: "bg-indigo-600",
-    accent: "bg-indigo-500",
-    soft: "bg-indigo-50",
-  },
-  violet: {
-    icon: "bg-violet-50 text-violet-600",
-    bar: "bg-violet-600",
-    accent: "bg-violet-500",
-    soft: "bg-violet-50",
-  },
-  sky: {
-    icon: "bg-sky-50 text-sky-600",
-    bar: "bg-sky-600",
-    accent: "bg-sky-500",
-    soft: "bg-sky-50",
-  },
-  emerald: {
-    icon: "bg-emerald-50 text-emerald-600",
-    bar: "bg-emerald-600",
-    accent: "bg-emerald-500",
-    soft: "bg-emerald-50",
-  },
-  rose: {
-    icon: "bg-rose-50 text-rose-600",
-    bar: "bg-rose-600",
-    accent: "bg-rose-500",
-    soft: "bg-rose-50",
-  },
-  amber: {
-    icon: "bg-amber-50 text-amber-600",
-    bar: "bg-amber-600",
-    accent: "bg-amber-500",
-    soft: "bg-amber-50",
-  },
-};
-
-const statusStyles = {
-  "In progress": "bg-blue-50 text-blue-700",
-  Planning: "bg-violet-50 text-violet-700",
-  Completed: "bg-emerald-50 text-emerald-700",
-  "On hold": "bg-amber-50 text-amber-700",
-  Archived: "bg-slate-100 text-slate-600",
-};
-
-const priorities = {
+const priorityStyles = {
+  Urgent: "text-rose-700 bg-rose-50",
   High: "text-red-600 bg-red-50",
   Medium: "text-amber-700 bg-amber-50",
   Low: "text-emerald-700 bg-emerald-50",
@@ -226,48 +86,104 @@ const priorities = {
 
 const filters = [
   "All projects",
+  "Not started",
   "In progress",
-  "Planning",
   "Completed",
-  "On hold",
+  "Archived",
 ];
 
-const defaultForm = {
+const defaultProjectForm = {
   name: "",
   description: "",
   category: "Product Development",
-  status: "Planning",
   priority: "Medium",
   deadline: "",
-  owner: "Mandeep Singh",
   color: "indigo",
 };
+
+const defaultTaskForm = {
+  title: "",
+  description: "",
+  assignedTo: "",
+  priority: "Medium",
+  dueDate: "",
+};
+
+// HELPERS
+function todayString() {
+  const date = new Date();
+  const local = new Date(
+    date.getTime() - date.getTimezoneOffset() * 60000
+  );
+  return local.toISOString().slice(0, 10);
+}
 
 function formatDate(date) {
   if (!date) return "No deadline";
 
-  return new Date(`${date}T00:00:00`).toLocaleDateString("en-US", {
+  const parsedDate = String(date).includes("T")
+    ? new Date(date)
+    : new Date(`${date}T00:00:00`);
+
+  if (Number.isNaN(parsedDate.getTime())) return "No deadline";
+
+  return parsedDate.toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
   });
 }
 
-function getProjectTasks(project) {
+function getTasks(project) {
   return Array.isArray(project?.tasks) ? project.tasks : [];
 }
 
-function getCompletedTaskCount(project) {
-  return getProjectTasks(project).filter(
-    (task) => task.status?.trim().toLowerCase() === "completed"
+function getCompletedCount(project) {
+  return getTasks(project).filter(
+    (task) => task.status === "Completed"
   ).length;
 }
 
-function getProjectProgress(project) {
-  const tasks = getProjectTasks(project);
+function getProgress(project) {
+  const tasks = getTasks(project);
+
   return tasks.length
-    ? Math.round((getCompletedTaskCount(project) / tasks.length) * 100)
+    ? Math.round((getCompletedCount(project) / tasks.length) * 100)
     : 0;
+}
+
+function getProjectStatus(project) {
+  if (project.archived) return "Archived";
+
+  const tasks = getTasks(project);
+
+  if (!tasks.length) return "Not started";
+
+  if (tasks.every((task) => task.status === "Completed")) {
+    return "Completed";
+  }
+
+  if (
+    tasks.some(
+      (task) =>
+        task.status === "In progress" ||
+        task.status === "Completed"
+    )
+  ) {
+    return "In progress";
+  }
+
+  return "Not started";
+}
+
+function getTaskStatus(task) {
+  if (task.status === "Completed") return "Completed";
+
+  if (task.dueDate && task.dueDate < todayString()) {
+    return "Overdue";
+  }
+
+  return task.status || "To do";
 }
 
 function getDaysRemaining(date) {
@@ -277,14 +193,46 @@ function getDaysRemaining(date) {
   today.setHours(0, 0, 0, 0);
 
   const deadline = new Date(`${date}T00:00:00`);
-  return Math.ceil((deadline - today) / (1000 * 60 * 60 * 24));
+
+  return Math.ceil((deadline - today) / 86400000);
+}
+
+function getInitials(name = "") {
+  return name
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase();
+}
+
+function getMember(project, userId) {
+  return project.members?.find(
+    (member) => member.userId === userId
+  );
+}
+
+function getCurrentRole(project, currentUserId) {
+  if (!currentUserId) return null;
+  return getMember(project, currentUserId)?.role || null;
+}
+
+function canCreateTask(project, currentUserId) {
+  const role = getCurrentRole(project, currentUserId);
+  return role === "owner" || role === "admin";
+}
+
+function canManageProject(project, currentUserId) {
+  return canCreateTask(project, currentUserId);
 }
 
 function StatusBadge({ status }) {
   return (
     <span
       className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${
-        statusStyles[status] || statusStyles.Planning
+        statusStyles[status] || statusStyles["Not started"]
       }`}
     >
       {status}
@@ -296,7 +244,7 @@ function PriorityBadge({ priority }) {
   return (
     <span
       className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${
-        priorities[priority] || priorities.Medium
+        priorityStyles[priority] || priorityStyles.Medium
       }`}
     >
       <Flag size={11} />
@@ -308,10 +256,10 @@ function PriorityBadge({ priority }) {
 function ProjectAvatars({ members = [], max = 3 }) {
   return (
     <div className="flex items-center">
-      {members.slice(0, max).map((initials, index) => (
+      {members.slice(0, max).map((member, index) => (
         <div
-          key={`${initials}-${index}`}
-          title={initials}
+          key={member.userId}
+          title={`${member.name} · ${member.role}`}
           className={`-ml-2 flex h-8 w-8 items-center justify-center rounded-full border-2 border-white text-[10px] font-bold first:ml-0 ${
             [
               "bg-indigo-100 text-indigo-700",
@@ -322,7 +270,7 @@ function ProjectAvatars({ members = [], max = 3 }) {
             ][index % 5]
           }`}
         >
-          {initials}
+          {getInitials(member.name || "Member")}
         </div>
       ))}
 
@@ -342,7 +290,9 @@ function ProgressBar({ value, color = "indigo" }) {
     <div className="h-2 overflow-hidden rounded-full bg-slate-100">
       <div
         className={`h-full rounded-full transition-all duration-500 ${style.bar}`}
-        style={{ width: `${Math.max(0, Math.min(value, 100))}%` }}
+        style={{
+          width: `${Math.max(0, Math.min(value, 100))}%`,
+        }}
       />
     </div>
   );
@@ -353,7 +303,9 @@ function SummaryCard({ label, value, detail, icon, iconClass }) {
     <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-sm font-medium text-slate-500">{label}</p>
+          <p className="text-sm font-medium text-slate-500">
+            {label}
+          </p>
           <p className="mt-3 text-3xl font-extrabold tracking-tight text-slate-900">
             {value}
           </p>
@@ -371,9 +323,39 @@ function SummaryCard({ label, value, detail, icon, iconClass }) {
   );
 }
 
-function ProjectCard({ project, onOpen, onMenu, menuOpen, onEdit, onArchive, onDelete }) {
-  const colors = projectColors[project.color] || projectColors.indigo;
+function DetailLine({ icon, label, value }) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <div className="flex items-center gap-2 text-sm text-slate-500">
+        {icon}
+        {label}
+      </div>
+
+      <span className="max-w-[55%] truncate text-right text-sm font-semibold text-slate-800">
+        {value}
+      </span>
+    </div>
+  );
+}
+
+
+function ProjectCard({
+  project,
+  onOpen,
+  onMenu,
+  menuOpen,
+  onEdit,
+  onArchive,
+  onDelete,
+  currentUserId,
+}) {
+  const colors =
+    projectColors[project.color] || projectColors.indigo;
+
   const remaining = getDaysRemaining(project.deadline);
+  const status = getProjectStatus(project);
+  const canManage = canManageProject(project, currentUserId);
+  const isOwner = getCurrentRole(project, currentUserId) === "owner";
 
   return (
     <article className="group relative flex min-w-0 flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-lg hover:shadow-slate-200/60">
@@ -384,53 +366,63 @@ function ProjectCard({ project, onOpen, onMenu, menuOpen, onEdit, onArchive, onD
           <FolderKanban size={22} />
         </div>
 
-        <div className="relative">
-          <button
-            type="button"
-            aria-label={`More options for ${project.name}`}
-            aria-expanded={menuOpen}
-            onClick={(event) => {
-              event.stopPropagation();
-              onMenu(project.id);
-            }}
-            className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
-          >
-            <MoreHorizontal size={19} />
-          </button>
-
-          {menuOpen && (
-            <div
-              className="absolute right-0 top-10 z-30 w-44 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl"
-              onClick={(event) => event.stopPropagation()}
+        {canManage && (
+          <div className="relative">
+            <button
+              type="button"
+              aria-label={`More options for ${project.name}`}
+              aria-expanded={menuOpen}
+              onClick={(event) => {
+                event.stopPropagation();
+                onMenu(project.id);
+              }}
+              className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
             >
-              <button
-                type="button"
-                onClick={() => onEdit(project)}
-                className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-medium text-slate-600 hover:bg-slate-50"
+              <MoreHorizontal size={19} />
+            </button>
+
+            {menuOpen && (
+              <div
+                className="absolute right-0 top-10 z-30 w-44 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl"
+                onClick={(event) => event.stopPropagation()}
               >
-                <Pencil size={14} />
-                Edit project
-              </button>
-              <button
-                type="button"
-                onClick={() => onArchive(project)}
-                className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-medium text-slate-600 hover:bg-slate-50"
-              >
-                <FolderKanban size={14} />
-                {project.status === "Archived" ? "Restore project" : "Archive project"}
-              </button>
-              <div className="my-1 border-t border-slate-100" />
-              <button
-                type="button"
-                onClick={() => onDelete(project)}
-                className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-medium text-red-600 hover:bg-red-50"
-              >
-                <Trash2 size={14} />
-                Delete project
-              </button>
-            </div>
-          )}
-        </div>
+                <button
+                  type="button"
+                  onClick={() => onEdit(project)}
+                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-medium text-slate-600 hover:bg-slate-50"
+                >
+                  <Pencil size={14} />
+                  Edit project
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => onArchive(project)}
+                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-medium text-slate-600 hover:bg-slate-50"
+                >
+                  <FolderKanban size={14} />
+                  {project.archived
+                    ? "Restore project"
+                    : "Archive project"}
+                </button>
+
+                {isOwner && (
+                  <>
+                    <div className="my-1 border-t border-slate-100" />
+                    <button
+                      type="button"
+                      onClick={() => onDelete(project)}
+                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-medium text-red-600 hover:bg-red-50"
+                    >
+                      <Trash2 size={14} />
+                      Delete project
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <button
@@ -439,8 +431,10 @@ function ProjectCard({ project, onOpen, onMenu, menuOpen, onEdit, onArchive, onD
         className="text-left"
       >
         <div className="mb-2 flex flex-wrap items-center gap-2">
-          <StatusBadge status={project.status} />
-          <span className="text-xs text-slate-400">{project.category}</span>
+          <StatusBadge status={status} />
+          <span className="text-xs text-slate-400">
+            {project.category}
+          </span>
         </div>
 
         <h3 className="truncate text-lg font-bold text-slate-900 transition group-hover:text-indigo-600">
@@ -458,19 +452,23 @@ function ProjectCard({ project, onOpen, onMenu, menuOpen, onEdit, onArchive, onD
             Project progress
           </span>
           <span className="text-xs font-bold tabular-nums text-slate-800">
-            {getProjectProgress(project)}%
+            {getProgress(project)}%
           </span>
         </div>
-        <ProgressBar value={getProjectProgress(project)} color={project.color} />
+
+        <ProgressBar
+          value={getProgress(project)}
+          color={project.color}
+        />
       </div>
 
       <div className="mt-5 grid grid-cols-2 gap-3 border-b border-slate-100 pb-5">
         <div>
           <p className="text-xs text-slate-400">Tasks completed</p>
           <p className="mt-1 text-sm font-bold text-slate-800">
-            {getCompletedTaskCount(project)}
+            {getCompletedCount(project)}
             <span className="ml-1 font-medium text-slate-400">
-              / {getProjectTasks(project).length}
+              / {getTasks(project).length}
             </span>
           </p>
         </div>
@@ -484,19 +482,17 @@ function ProjectCard({ project, onOpen, onMenu, menuOpen, onEdit, onArchive, onD
       </div>
 
       <div className="mt-4 flex items-center justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-2">
-          <ProjectAvatars members={project.members} />
-        </div>
+        <ProjectAvatars members={project.members || []} />
 
         <div className="flex shrink-0 items-center gap-1.5 text-xs text-slate-400">
           <CalendarDays size={13} />
           {remaining === null
             ? "No date"
             : remaining < 0
-            ? `${Math.abs(remaining)} days overdue`
-            : remaining === 0
-            ? "Due today"
-            : `${remaining} days left`}
+              ? `${Math.abs(remaining)} days overdue`
+              : remaining === 0
+                ? "Due today"
+                : `${remaining} days left`}
         </div>
       </div>
 
@@ -512,42 +508,159 @@ function ProjectCard({ project, onOpen, onMenu, menuOpen, onEdit, onArchive, onD
   );
 }
 
+
 export default function ProjectsPage() {
-  const [projects, setProjects] = useState(initialProjects);
+  const [projects, setProjects] = useState([]);
+  const [currentUser, setCurrentUser] = useState({ id: "", name: "" });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [loadError, setLoadError] = useState("");
   const [activeFilter, setActiveFilter] = useState("All projects");
   const [search, setSearch] = useState("");
   const [priorityFilter, setPriorityFilter] = useState("All priorities");
   const [viewMode, setViewMode] = useState("grid");
 
-  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showProjectModal, setShowProjectModal] = useState(false);
+  const [showTaskModal, setShowTaskModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
-  const [selectedProject, setSelectedProject] = useState(null);
 
+  const [selectedProject, setSelectedProject] = useState(null);
   const [openMenu, setOpenMenu] = useState(null);
   const [notice, setNotice] = useState("");
-  const [form, setForm] = useState(defaultForm);
+
+  const [projectForm, setProjectForm] = useState(defaultProjectForm);
+  const [taskForm, setTaskForm] = useState(defaultTaskForm);
   const [editingId, setEditingId] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteTaskTarget, setDeleteTaskTarget] = useState(null);
 
-  const totalProjects = projects.filter(
-    (project) => project.status !== "Archived"
+  const refreshData = useCallback(async () => {
+    const [projectsResponse, tasksResponse, sessionResponse] = await Promise.all([
+      fetch("/api/projects", { cache: "no-store" }),
+      fetch("/api/tasks", { cache: "no-store" }),
+      fetch("/api/auth/session", { cache: "no-store" }),
+    ]);
+
+    const [projectsData, tasksData, sessionData] = await Promise.all([
+      projectsResponse.json(),
+      tasksResponse.json(),
+      sessionResponse.json(),
+    ]);
+
+    if (!projectsResponse.ok) {
+      throw new Error(projectsData.error || "Could not load projects.");
+    }
+    if (!tasksResponse.ok) {
+      throw new Error(tasksData.error || "Could not load tasks.");
+    }
+
+    const userId = String(sessionData?.user?.id || "");
+    const userName = sessionData?.user?.name || sessionData?.user?.email || "You";
+    setCurrentUser({ id: userId, name: userName });
+
+    const taskRows = Array.isArray(tasksData)
+      ? tasksData
+      : Array.isArray(tasksData.tasks)
+        ? tasksData.tasks
+        : [];
+
+    const normalizedTasks = taskRows.map((task) => ({
+      ...task,
+      id: String(task._id || task.id),
+      projectId: task.projectId ? String(task.projectId) : null,
+      assignedTo: task.assignedTo ? String(task.assignedTo) : "",
+      createdBy: task.createdBy ? String(task.createdBy) : "",
+      dueDate: task.dueDate || "",
+    }));
+
+    const projectRows = Array.isArray(projectsData)
+      ? projectsData
+      : Array.isArray(projectsData.projects)
+        ? projectsData.projects
+        : [];
+
+    const normalizedProjects = projectRows.map((project) => {
+      const ownerId = String(project.ownerId || "");
+      const rawMembers = Array.isArray(project.members) ? project.members : [];
+      const members = rawMembers.map((member) => {
+        const memberId = String(member.userId || member._id || member.id || "");
+        const role = member.role || (memberId === ownerId ? "owner" : "member");
+        return {
+          userId: memberId,
+          name: member.name || member.displayName || (memberId === userId ? userName : `Member ${memberId.slice(-4)}`),
+          role,
+        };
+      });
+
+      if (ownerId && !members.some((member) => member.userId === ownerId)) {
+        members.unshift({
+          userId: ownerId,
+          name: ownerId === userId ? userName : `Member ${ownerId.slice(-4)}`,
+          role: "owner",
+        });
+      }
+
+      return {
+        ...project,
+        id: String(project._id || project.id),
+        ownerId,
+        name: project.name || "Untitled project",
+        description: project.description || "",
+        category: project.category || "Other",
+        priority: project.priority || "Medium",
+        color: project.color || "indigo",
+        deadline: project.deadline || "",
+        createdAt: project.createdAt || "",
+        archived: Boolean(project.archived),
+        members,
+        tasks: normalizedTasks.filter((task) => task.projectId === String(project._id || project.id)),
+      };
+    });
+
+    setProjects(normalizedProjects);
+    setSelectedProject((previous) => {
+      if (!previous) return previous;
+      return normalizedProjects.find((project) => project.id === previous.id) || null;
+    });
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        setLoading(true);
+        setLoadError("");
+        await refreshData();
+      } catch (error) {
+        if (active) setLoadError(error.message || "Something went wrong while loading projects.");
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+    return () => { active = false; };
+  }, [refreshData]);
+
+  const activeProjectsList = projects.filter(
+    (project) => !project.archived
+  );
+
+  const totalProjects = activeProjectsList.length;
+
+  const activeProjects = activeProjectsList.filter(
+    (project) => getProjectStatus(project) === "In progress"
   ).length;
 
-  const activeProjects = projects.filter(
-    (project) => project.status === "In progress"
+  const completedProjects = activeProjectsList.filter(
+    (project) => getProjectStatus(project) === "Completed"
   ).length;
 
-  const completedProjects = projects.filter(
-    (project) => project.status === "Completed"
-  ).length;
-
-  const totalTasks = projects.reduce(
-    (sum, project) => sum + getProjectTasks(project).length,
+  const totalTasks = activeProjectsList.reduce(
+    (sum, project) => sum + getTasks(project).length,
     0
   );
 
-  const completedTasks = projects.reduce(
-    (sum, project) => sum + getCompletedTaskCount(project),
+  const completedTasks = activeProjectsList.reduce(
+    (sum, project) => sum + getCompletedCount(project),
     0
   );
 
@@ -555,9 +668,13 @@ export default function ProjectsPage() {
     let result = [...projects];
 
     if (activeFilter === "All projects") {
-      result = result.filter((project) => project.status !== "Archived");
+      result = result.filter((project) => !project.archived);
+    } else if (activeFilter === "Archived") {
+      result = result.filter((project) => project.archived);
     } else {
-      result = result.filter((project) => project.status === activeFilter);
+      result = result.filter(
+        (project) => getProjectStatus(project) === activeFilter
+      );
     }
 
     if (priorityFilter !== "All priorities") {
@@ -574,9 +691,9 @@ export default function ProjectsPage() {
           project.name,
           project.description,
           project.category,
-          project.owner,
-          project.status,
           project.priority,
+          getProjectStatus(project),
+          ...(project.members || []).map((member) => member.name),
         ]
           .join(" ")
           .toLowerCase()
@@ -592,140 +709,271 @@ export default function ProjectsPage() {
     window.setTimeout(() => setNotice(""), 2800);
   };
 
-  const startCreate = () => {
-    setForm(defaultForm);
+  // CREATE / EDIT PROJECT
+  const startCreateProject = () => {
+    setProjectForm(defaultProjectForm);
     setEditingId(null);
-    setShowCreateModal(true);
+    setShowProjectModal(true);
     setOpenMenu(null);
   };
 
-  const startEdit = (project) => {
-    setForm({
+  const startEditProject = (project) => {
+    if (!canManageProject(project, currentUser.id)) {
+      notify("Only project owners and admins can edit this project.");
+      return;
+    }
+
+    setProjectForm({
       name: project.name,
       description: project.description,
       category: project.category,
-      status: project.status,
       priority: project.priority,
       deadline: project.deadline || "",
-      owner: project.owner,
-      color: project.color,
+      color: project.color || "indigo",
     });
+
     setEditingId(project.id);
-    setShowCreateModal(true);
+    setShowProjectModal(true);
     setOpenMenu(null);
   };
 
-  const handleSaveProject = (event) => {
+  const handleSaveProject = async (event) => {
     event.preventDefault();
-
-    const name = form.name.trim();
-
+    const name = projectForm.name.trim();
     if (!name) return;
 
-    if (editingId) {
-      setProjects((previous) =>
-        previous.map((project) =>
-          project.id === editingId
-            ? { ...project, ...form, name }
-            : project
-        )
+    setSaving(true);
+    try {
+      const response = await fetch(
+        editingId ? `/api/projects/${editingId}` : "/api/projects",
+        {
+          method: editingId ? "PATCH" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...projectForm, name }),
+        }
       );
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not save project.");
 
-      setSelectedProject((previous) =>
-        previous?.id === editingId
-          ? { ...previous, ...form, name }
-          : previous
-      );
-
-      notify("Project updated in demo data.");
-    } else {
-      const newProject = {
-        ...form,
-        id: Date.now(),
-        name,
-        progress: 0,
-        tasks: [],
-        members: ["MS"],
-        memberNames: ["Mandeep Singh"],
-        createdAt: new Date().toISOString().slice(0, 10),
-      };
-
-      setProjects((previous) => [newProject, ...previous]);
-      notify("New project created.");
+      await refreshData();
+      setShowProjectModal(false);
+      setEditingId(null);
+      setProjectForm(defaultProjectForm);
+      notify(editingId ? "Project updated successfully." : "Project created successfully.");
+    } catch (error) {
+      notify(error.message || "Could not save project.");
+    } finally {
+      setSaving(false);
     }
-
-    setShowCreateModal(false);
-    setEditingId(null);
-    setForm(defaultForm);
   };
 
+  // OPEN PROJECT DETAILS
   const openProject = (project) => {
     setSelectedProject(project);
     setShowDetailsModal(true);
     setOpenMenu(null);
   };
 
-  const toggleArchive = (project) => {
-    const nextStatus =
-      project.status === "Archived" ? "Planning" : "Archived";
-
-    setProjects((previous) =>
-      previous.map((item) =>
-        item.id === project.id ? { ...item, status: nextStatus } : item
-      )
-    );
-
-    setSelectedProject((previous) =>
-      previous?.id === project.id
-        ? { ...previous, status: nextStatus }
-        : previous
-    );
-
-    setOpenMenu(null);
-    notify(
-      nextStatus === "Archived"
-        ? "Project archived."
-        : "Project restored."
-    );
+  // ARCHIVE / RESTORE PROJECT
+  const toggleArchive = async (project) => {
+    if (!canManageProject(project, currentUser.id)) {
+      notify("Only project owners and admins can archive this project.");
+      return;
+    }
+    const nextArchived = !project.archived;
+    setSaving(true);
+    try {
+      const response = await fetch(`/api/projects/${project.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ archived: nextArchived }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not update project.");
+      await refreshData();
+      setOpenMenu(null);
+      notify(nextArchived ? "Project archived." : "Project restored.");
+    } catch (error) {
+      notify(error.message || "Could not update project.");
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const confirmDelete = () => {
+  // DELETE PROJECT — OWNER ONLY
+  const confirmDelete = async () => {
     if (!deleteTarget) return;
+    if (getCurrentRole(deleteTarget, currentUser.id) !== "owner") {
+      notify("Only the project owner can delete this project.");
+      setDeleteTarget(null);
+      return;
+    }
+    setSaving(true);
+    try {
+      const response = await fetch(`/api/projects/${deleteTarget.id}`, { method: "DELETE" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not delete project.");
+      if (selectedProject?.id === deleteTarget.id) {
+        setShowDetailsModal(false);
+        setSelectedProject(null);
+      }
+      setDeleteTarget(null);
+      setOpenMenu(null);
+      await refreshData();
+      notify("Project and its tasks deleted successfully.");
+    } catch (error) {
+      notify(error.message || "Could not delete project.");
+    } finally {
+      setSaving(false);
+    }
+  };
 
-    setProjects((previous) =>
-      previous.filter((project) => project.id !== deleteTarget.id)
-    );
-
-    if (selectedProject?.id === deleteTarget.id) {
-      setShowDetailsModal(false);
-      setSelectedProject(null);
+  // CREATE PROJECT TASK — OWNER / ADMIN ONLY
+  const startCreateTask = () => {
+    if (!selectedProject || !canCreateTask(selectedProject, currentUser.id)) {
+      notify("Only project owners and admins can create tasks.");
+      return;
     }
 
-    setDeleteTarget(null);
-    setOpenMenu(null);
-    notify("Project deleted from demo data.");
+    setTaskForm({
+      ...defaultTaskForm,
+      assignedTo: selectedProject.members?.[0]?.userId || "",
+    });
+
+    setShowTaskModal(true);
   };
 
+  const handleCreateProjectTask = async (event) => {
+    event.preventDefault();
+    if (!selectedProject || !canCreateTask(selectedProject, currentUser.id)) {
+      notify("You do not have permission to create tasks in this project.");
+      return;
+    }
+    const validAssignee = selectedProject.members?.some((member) => member.userId === taskForm.assignedTo);
+    if (!validAssignee) {
+      notify("Choose a member of this project.");
+      return;
+    }
+    const title = taskForm.title.trim();
+    if (!title) return;
 
+    setSaving(true);
+    try {
+      const response = await fetch("/api/tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title,
+          description: taskForm.description.trim(),
+          projectId: selectedProject.id,
+          assignedTo: taskForm.assignedTo,
+          priority: taskForm.priority,
+          dueDate: taskForm.dueDate || null,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not create task.");
+      await refreshData();
+      setShowTaskModal(false);
+      setTaskForm(defaultTaskForm);
+      notify("Task created in this project.");
+    } catch (error) {
+      notify(error.message || "Could not create task.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // UPDATE TASK STATUS — OWNER / ADMIN ONLY
+  const updateTaskStatus = async (taskId, nextStatus) => {
+    if (!selectedProject || !canManageProject(selectedProject, currentUser.id)) {
+      notify("Only project owners and admins can update task status.");
+      return;
+    }
+    try {
+      const response = await fetch(`/api/tasks/${taskId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: nextStatus }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not update task.");
+      await refreshData();
+    } catch (error) {
+      notify(error.message || "Could not update task.");
+      await refreshData();
+    }
+  };
+
+  // OPEN TASK DELETE CONFIRMATION
+  const requestDeleteTask = (task) => {
+    if (!selectedProject || !canManageProject(selectedProject, currentUser.id)) {
+      notify("Only project owners and admins can delete tasks.");
+      return;
+    }
+
+    setDeleteTaskTarget(task);
+  };
+
+  // CONFIRM TASK DELETE — OWNER / ADMIN ONLY
+  const confirmDeleteTask = async () => {
+    if (!selectedProject || !deleteTaskTarget) return;
+    if (!canManageProject(selectedProject, currentUser.id)) {
+      notify("Only project owners and admins can delete tasks.");
+      setDeleteTaskTarget(null);
+      return;
+    }
+    try {
+      const response = await fetch(`/api/tasks/${deleteTaskTarget.id}`, { method: "DELETE" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not delete task.");
+      setDeleteTaskTarget(null);
+      await refreshData();
+      notify("Task deleted successfully.");
+    } catch (error) {
+      notify(error.message || "Could not delete task.");
+    }
+  };
+
+  const snapshot = [
+    {
+      label: "Not started",
+      count: activeProjectsList.filter(
+        (project) => getProjectStatus(project) === "Not started"
+      ).length,
+      color: "bg-slate-400",
+    },
+    {
+      label: "In progress",
+      count: activeProjectsList.filter(
+        (project) => getProjectStatus(project) === "In progress"
+      ).length,
+      color: "bg-blue-500",
+          },
+    {
+      label: "Completed",
+      count: activeProjectsList.filter(
+        (project) => getProjectStatus(project) === "Completed"
+      ).length,
+      color: "bg-emerald-500",
+    },
+  ];
 
   return (
     <main
       className="flex h-dvh w-full overflow-hidden bg-[#f7f8fc] text-slate-800"
       onClick={() => openMenu && setOpenMenu(null)}
     >
-      {/* Desktop sidebar */}
       <div className="hidden shrink-0 lg:block">
         <Sidebar active="projects" />
       </div>
 
-      {/* Mobile sidebar */}
       <div className="lg:hidden">
         <Sidebarmob active="projects" />
       </div>
 
-      {/* Content starts after the fixed mobile rail */}
       <section className="ml-[76px] flex min-w-0 flex-1 flex-col overflow-hidden lg:ml-0">
-        {/* Header */}
+        {/* HEADER */}
         <header className="flex min-h-[76px] items-center justify-between border-b border-slate-200 bg-white px-4 sm:px-7 lg:px-9">
           <div>
             <p className="text-xs font-medium text-slate-400">
@@ -738,7 +986,8 @@ export default function ProjectsPage() {
 
           <button
             type="button"
-            onClick={startCreate}
+            onClick={startCreateProject}
+            disabled={loading || !currentUser.id}
             className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-3.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 active:scale-[0.98] sm:px-4"
           >
             <Plus size={17} />
@@ -747,18 +996,30 @@ export default function ProjectsPage() {
           </button>
         </header>
 
-        {/* Page body */}
+        {loadError && (
+          <div className="border-b border-red-100 bg-red-50 px-5 py-3 text-sm text-red-700">
+            {loadError}{" "}
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="ml-2 font-semibold underline"
+            >
+              Try again
+            </button>
+          </div>
+        )}
+
+        {/* PAGE BODY */}
         <div className="flex-1 overflow-y-auto px-4 py-6 sm:px-7 lg:px-9 lg:py-8">
           <div className="mx-auto max-w-[1500px]">
-            {/* Heading */}
             <div className="mb-7 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
               <div>
                 <h2 className="text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">
                   Your work, in one place.
                 </h2>
                 <p className="mt-2 max-w-xl text-sm leading-6 text-slate-500">
-                  Bring your projects into one clear view. Track progress, see
-                  who&apos;s involved, and keep the next steps visible.
+                  Bring your projects into one clear view. Track progress,
+                  see who&apos;s involved, and keep the next steps visible.
                 </p>
               </div>
 
@@ -768,7 +1029,7 @@ export default function ProjectsPage() {
               </div>
             </div>
 
-            {/* Summary */}
+            {/* SUMMARY CARDS */}
             <div className="mb-7 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
               <SummaryCard
                 label="Total projects"
@@ -797,13 +1058,13 @@ export default function ProjectsPage() {
               <SummaryCard
                 label="Tasks completed"
                 value={`${completedTasks}/${totalTasks}`}
-                detail="Across all listed projects"
+                detail="Across all active projects"
                 icon={<Target size={21} />}
                 iconClass="bg-violet-50 text-violet-600"
               />
             </div>
 
-            {/* Project progress overview */}
+            {/* WORKSPACE PROGRESS + SNAPSHOT */}
             <div className="mb-7 grid grid-cols-1 gap-4 lg:grid-cols-[1.5fr_1fr]">
               <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                 <div className="flex items-start justify-between gap-3">
@@ -815,6 +1076,7 @@ export default function ProjectsPage() {
                       Combined task completion across projects
                     </p>
                   </div>
+
                   <div className="rounded-xl bg-indigo-50 p-2.5 text-indigo-600">
                     <Target size={19} />
                   </div>
@@ -877,36 +1139,7 @@ export default function ProjectsPage() {
                 </div>
 
                 <div className="mt-5 space-y-4">
-                  {[
-                    {
-                      label: "In progress",
-                      count: projects.filter(
-                        (p) => p.status === "In progress"
-                      ).length,
-                      color: "bg-blue-500",
-                    },
-                    {
-                      label: "Planning",
-                      count: projects.filter(
-                        (p) => p.status === "Planning"
-                      ).length,
-                      color: "bg-violet-500",
-                    },
-                    {
-                      label: "Completed",
-                      count: projects.filter(
-                        (p) => p.status === "Completed"
-                      ).length,
-                      color: "bg-emerald-500",
-                    },
-                    {
-                      label: "On hold",
-                      count: projects.filter(
-                        (p) => p.status === "On hold"
-                      ).length,
-                      color: "bg-amber-500",
-                    },
-                  ].map((item) => (
+                  {snapshot.map((item) => (
                     <div
                       key={item.label}
                       className="flex items-center justify-between"
@@ -919,6 +1152,7 @@ export default function ProjectsPage() {
                           {item.label}
                         </span>
                       </div>
+
                       <span className="text-sm font-bold tabular-nums text-slate-800">
                         {item.count}
                       </span>
@@ -928,7 +1162,7 @@ export default function ProjectsPage() {
               </div>
             </div>
 
-            {/* Project list */}
+            {/* PROJECT LIST */}
             <div className="overflow-visible rounded-2xl border border-slate-200 bg-white shadow-sm">
               <div className="flex flex-col justify-between gap-4 border-b border-slate-100 p-5 lg:flex-row lg:items-center">
                 <div>
@@ -946,9 +1180,11 @@ export default function ProjectsPage() {
                       size={16}
                       className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
                     />
+
                     <label htmlFor="project-search" className="sr-only">
                       Search projects
                     </label>
+
                     <input
                       id="project-search"
                       type="search"
@@ -964,6 +1200,7 @@ export default function ProjectsPage() {
                       size={15}
                       className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
                     />
+
                     <select
                       value={priorityFilter}
                       onChange={(event) =>
@@ -973,10 +1210,12 @@ export default function ProjectsPage() {
                       className="h-10 w-full appearance-none rounded-xl border border-slate-200 bg-white pl-9 pr-8 text-sm font-medium text-slate-600 outline-none focus:border-indigo-400 sm:w-auto"
                     >
                       <option>All priorities</option>
+                      <option>Urgent</option>
                       <option>High</option>
                       <option>Medium</option>
                       <option>Low</option>
                     </select>
+
                     <ChevronDown
                       size={14}
                       className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"
@@ -997,6 +1236,7 @@ export default function ProjectsPage() {
                     >
                       <LayoutGrid size={17} />
                     </button>
+
                     <button
                       type="button"
                       onClick={() => setViewMode("list")}
@@ -1014,13 +1254,17 @@ export default function ProjectsPage() {
                 </div>
               </div>
 
-              {/* Status filters */}
+              {/* FILTERS */}
               <div className="flex gap-2 overflow-x-auto border-b border-slate-100 px-5 py-3">
                 {filters.map((filter) => {
                   const count =
                     filter === "All projects"
-                      ? projects.filter((p) => p.status !== "Archived").length
-                      : projects.filter((p) => p.status === filter).length;
+                      ? projects.filter((project) => !project.archived).length
+                      : filter === "Archived"
+                        ? projects.filter((project) => project.archived).length
+                        : projects.filter(
+                            (project) => getProjectStatus(project) === filter
+                          ).length;
 
                   return (
                     <button
@@ -1040,20 +1284,25 @@ export default function ProjectsPage() {
                 })}
               </div>
 
-              {/* Projects */}
+              {/* PROJECT CARDS */}
               <div className="p-4 sm:p-5">
-                {filteredProjects.length === 0 ? (
+                {loading ? (
+                  <div className="flex min-h-64 items-center justify-center text-sm font-medium text-slate-400">Loading your projects...</div>
+                ) : filteredProjects.length === 0 ? (
                   <div className="flex min-h-64 flex-col items-center justify-center px-5 text-center">
                     <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
                       <FolderKanban size={25} />
                     </div>
+
                     <h4 className="font-bold text-slate-800">
                       No projects found
                     </h4>
+
                     <p className="mt-1 max-w-sm text-sm text-slate-400">
                       Try another search or change your filters to see more
                       projects.
                     </p>
+
                     <button
                       type="button"
                       onClick={() => {
@@ -1077,9 +1326,10 @@ export default function ProjectsPage() {
                         onMenu={(id) =>
                           setOpenMenu(openMenu === id ? null : id)
                         }
-                        onEdit={startEdit}
+                        onEdit={startEditProject}
                         onArchive={toggleArchive}
                         onDelete={setDeleteTarget}
+                        currentUserId={currentUser.id}
                       />
                     ))}
                   </div>
@@ -1108,8 +1358,11 @@ export default function ProjectsPage() {
                             <span className="truncate text-sm font-bold text-slate-800">
                               {project.name}
                             </span>
-                            <StatusBadge status={project.status} />
+                            <StatusBadge
+                              status={getProjectStatus(project)}
+                            />
                           </div>
+
                           <p className="mt-1 truncate text-xs text-slate-400">
                             {project.description}
                           </p>
@@ -1119,19 +1372,24 @@ export default function ProjectsPage() {
                           <div className="mb-2 flex items-center justify-between text-xs">
                             <span className="text-slate-400">Progress</span>
                             <span className="font-bold text-slate-700">
-                              {getProjectProgress(project)}%
+                              {getProgress(project)}%
                             </span>
                           </div>
+
                           <ProgressBar
-                            value={getProjectProgress(project)}
+                            value={getProgress(project)}
                             color={project.color}
                           />
                         </div>
 
                         <div className="flex items-center justify-between gap-4 sm:w-40 sm:justify-end">
-                          <ProjectAvatars members={project.members} />
+                          <ProjectAvatars
+                            members={project.members || []}
+                          />
+
                           <span className="text-xs text-slate-400">
-                            {getCompletedTaskCount(project)}/{getProjectTasks(project).length} tasks
+                            {getCompletedCount(project)}/
+                            {getTasks(project).length} tasks
                           </span>
                         </div>
 
@@ -1153,8 +1411,9 @@ export default function ProjectsPage() {
                 <p className="text-xs text-slate-400">
                   Showing {filteredProjects.length} of {projects.length} projects
                 </p>
+
                 <span className="text-xs font-medium text-slate-500">
-                  Demo workspace
+                  Live workspace
                 </span>
               </div>
             </div>
@@ -1166,13 +1425,13 @@ export default function ProjectsPage() {
         </div>
       </section>
 
-      {/* Create / edit project modal */}
-      {showCreateModal && (
+      {/* CREATE / EDIT PROJECT MODAL */}
+      {showProjectModal && (
         <div
           className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-slate-950/50 p-4 backdrop-blur-sm"
           onMouseDown={(event) => {
             if (event.target === event.currentTarget) {
-              setShowCreateModal(false);
+                            setShowProjectModal(false);
             }
           }}
         >
@@ -1182,9 +1441,11 @@ export default function ProjectsPage() {
                 <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
                   <FolderKanban size={20} />
                 </div>
+
                 <h3 className="text-xl font-bold text-slate-900">
                   {editingId ? "Edit project" : "Create a project"}
                 </h3>
+
                 <p className="mt-1 text-sm text-slate-400">
                   Give your team a clear place to work together.
                 </p>
@@ -1192,7 +1453,7 @@ export default function ProjectsPage() {
 
               <button
                 type="button"
-                onClick={() => setShowCreateModal(false)}
+                onClick={() => setShowProjectModal(false)}
                 aria-label="Close project form"
                 className="rounded-lg p-2 text-slate-400 hover:bg-slate-100"
               >
@@ -1208,13 +1469,17 @@ export default function ProjectsPage() {
                 >
                   Project name *
                 </label>
+
                 <input
                   id="project-name"
                   required
                   autoFocus
-                  value={form.name}
+                  value={projectForm.name}
                   onChange={(event) =>
-                    setForm({ ...form, name: event.target.value })
+                    setProjectForm({
+                      ...projectForm,
+                      name: event.target.value,
+                    })
                   }
                   placeholder="e.g. Website redesign"
                   className="h-12 w-full rounded-xl border border-slate-200 px-3 text-base outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50 sm:text-sm"
@@ -1228,12 +1493,16 @@ export default function ProjectsPage() {
                 >
                   Description
                 </label>
+
                 <textarea
                   id="project-description"
                   rows={3}
-                  value={form.description}
+                  value={projectForm.description}
                   onChange={(event) =>
-                    setForm({ ...form, description: event.target.value })
+                    setProjectForm({
+                      ...projectForm,
+                      description: event.target.value,
+                    })
                   }
                   placeholder="What is this project about?"
                   className="w-full resize-y rounded-xl border border-slate-200 p-3 text-base outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50 sm:text-sm"
@@ -1248,11 +1517,15 @@ export default function ProjectsPage() {
                   >
                     Category
                   </label>
+
                   <select
                     id="project-category"
-                    value={form.category}
+                    value={projectForm.category}
                     onChange={(event) =>
-                      setForm({ ...form, category: event.target.value })
+                      setProjectForm({
+                        ...projectForm,
+                        category: event.target.value,
+                      })
                     }
                     className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-base outline-none focus:border-indigo-500 sm:text-sm"
                   >
@@ -1273,55 +1546,42 @@ export default function ProjectsPage() {
                   >
                     Priority
                   </label>
+
                   <select
                     id="project-priority"
-                    value={form.priority}
+                    value={projectForm.priority}
                     onChange={(event) =>
-                      setForm({ ...form, priority: event.target.value })
+                      setProjectForm({
+                        ...projectForm,
+                        priority: event.target.value,
+                      })
                     }
                     className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-base outline-none focus:border-indigo-500 sm:text-sm"
                   >
                     <option>Low</option>
                     <option>Medium</option>
                     <option>High</option>
+                    <option>Urgent</option>
                   </select>
                 </div>
 
-                <div>
-                  <label
-                    htmlFor="project-status"
-                    className="mb-2 block text-sm font-semibold text-slate-700"
-                  >
-                    Status
-                  </label>
-                  <select
-                    id="project-status"
-                    value={form.status}
-                    onChange={(event) =>
-                      setForm({ ...form, status: event.target.value })
-                    }
-                    className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-base outline-none focus:border-indigo-500 sm:text-sm"
-                  >
-                    <option>Planning</option>
-                    <option>In progress</option>
-                    <option>Completed</option>
-                    <option>On hold</option>
-                  </select>
-                </div>
-
-                <div>
+                <div className="sm:col-span-2">
                   <label
                     htmlFor="project-deadline"
                     className="mb-2 block text-sm font-semibold text-slate-700"
                   >
                     Deadline
                   </label>
+
                   <input
                     id="project-deadline"
                     type="date"
-                    value={form.deadline}
+                    value={projectForm.deadline}
                     onChange={(event) =>
-                      setForm({ ...form, deadline: event.target.value })
+                      setProjectForm({
+                        ...projectForm,
+                        deadline: event.target.value,
+                      })
                     }
                     className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-base outline-none focus:border-indigo-500 sm:text-sm"
                   />
@@ -1332,16 +1592,19 @@ export default function ProjectsPage() {
                 <p className="mb-2 text-sm font-semibold text-slate-700">
                   Project color
                 </p>
+
                 <div className="flex flex-wrap gap-3">
                   {Object.entries(projectColors).map(([color, style]) => (
                     <button
                       key={color}
                       type="button"
                       aria-label={`Choose ${color} project color`}
-                      aria-pressed={form.color === color}
-                      onClick={() => setForm({ ...form, color })}
+                      aria-pressed={projectForm.color === color}
+                      onClick={() =>
+                        setProjectForm({ ...projectForm, color })
+                      }
                       className={`h-8 w-8 rounded-full ${style.accent} ${
-                        form.color === color
+                        projectForm.color === color
                           ? "ring-2 ring-offset-2 ring-indigo-500"
                           : ""
                       }`}
@@ -1350,10 +1613,16 @@ export default function ProjectsPage() {
                 </div>
               </div>
 
+              {!editingId && (
+                <p className="rounded-xl bg-indigo-50 px-3 py-2.5 text-xs leading-5 text-indigo-700">
+                  You will automatically become the owner of this project.
+                </p>
+              )}
+
               <div className="flex flex-col-reverse gap-3 pt-3 sm:flex-row sm:justify-end">
                 <button
                   type="button"
-                  onClick={() => setShowCreateModal(false)}
+                  onClick={() => setShowProjectModal(false)}
                   className="h-11 rounded-xl border border-slate-200 px-5 text-sm font-semibold text-slate-600 hover:bg-slate-50"
                 >
                   Cancel
@@ -1361,9 +1630,10 @@ export default function ProjectsPage() {
 
                 <button
                   type="submit"
-                  className="h-11 rounded-xl bg-indigo-600 px-6 text-sm font-semibold text-white transition hover:bg-indigo-700"
+                  disabled={saving}
+                  className="h-11 rounded-xl bg-indigo-600 px-6 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {editingId ? "Save changes" : "Create project"}
+                  {saving ? "Saving..." : editingId ? "Save changes" : "Create project"}
                 </button>
               </div>
             </form>
@@ -1371,33 +1641,51 @@ export default function ProjectsPage() {
         </div>
       )}
 
-      {/* Project workspace details */}
+      {/* PROJECT DETAILS MODAL */}
       {showDetailsModal && selectedProject && (
         <div
           className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-slate-950/50 p-3 backdrop-blur-sm sm:p-5"
           onMouseDown={(event) => {
-            if (event.target === event.currentTarget) {
+            if (
+              event.target === event.currentTarget &&
+              !showTaskModal &&
+              !deleteTaskTarget
+            ) {
               setShowDetailsModal(false);
             }
           }}
         >
           <div className="flex max-h-[94dvh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
-            {/* Project header */}
             <div className="flex items-start justify-between gap-4 border-b border-slate-100 bg-slate-50 px-5 py-5 sm:px-7 sm:py-6">
               <div className="flex min-w-0 items-start gap-3 sm:gap-4">
                 <div
-                  className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl sm:h-12 sm:w-12 ${(projectColors[selectedProject.color] || projectColors.indigo).icon}`}
+                  className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl sm:h-12 sm:w-12 ${
+                    (projectColors[selectedProject.color] ||
+                      projectColors.indigo).icon
+                  }`}
                 >
                   <FolderKanban size={22} />
                 </div>
+
                 <div className="min-w-0">
                   <div className="mb-2 flex flex-wrap items-center gap-2">
-                    <StatusBadge status={selectedProject.status} />
+                    <StatusBadge
+                      status={getProjectStatus(selectedProject)}
+                    />
+
                     <PriorityBadge priority={selectedProject.priority} />
+
+                    {getCurrentRole(selectedProject, currentUser.id) && (
+                      <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold capitalize text-indigo-700">
+                        Your role: {getCurrentRole(selectedProject, currentUser.id)}
+                      </span>
+                    )}
                   </div>
+
                   <h3 className="truncate pr-2 text-lg font-bold text-slate-900 sm:text-xl">
                     {selectedProject.name}
                   </h3>
+
                   <p className="mt-1 max-w-2xl text-sm leading-5 text-slate-500">
                     {selectedProject.description}
                   </p>
@@ -1415,169 +1703,644 @@ export default function ProjectsPage() {
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6 lg:p-7">
+              {/* PROJECT METRICS */}
               <div className="mb-6 grid grid-cols-3 gap-3">
                 <div className="rounded-xl border border-slate-100 bg-white p-3 sm:p-4">
-                  <p className="text-[11px] font-medium text-slate-400 sm:text-xs">Total tasks</p>
-                  <p className="mt-1 text-xl font-bold tabular-nums text-slate-900 sm:text-2xl">{getProjectTasks(selectedProject).length}</p>
+                  <p className="text-[11px] font-medium text-slate-400 sm:text-xs">
+                    Total tasks
+                  </p>
+                  <p className="mt-1 text-xl font-bold tabular-nums text-slate-900 sm:text-2xl">
+                    {getTasks(selectedProject).length}
+                  </p>
                 </div>
+
                 <div className="rounded-xl border border-slate-100 bg-white p-3 sm:p-4">
-                  <p className="text-[11px] font-medium text-slate-400 sm:text-xs">Completed</p>
-                  <p className="mt-1 text-xl font-bold tabular-nums text-emerald-600 sm:text-2xl">{getCompletedTaskCount(selectedProject)}</p>
+                  <p className="text-[11px] font-medium text-slate-400 sm:text-xs">
+                    Completed
+                  </p>
+                  <p className="mt-1 text-xl font-bold tabular-nums text-emerald-600 sm:text-2xl">
+                    {getCompletedCount(selectedProject)}
+                  </p>
                 </div>
+
                 <div className="rounded-xl border border-slate-100 bg-white p-3 sm:p-4">
-                  <p className="text-[11px] font-medium text-slate-400 sm:text-xs">Team members</p>
-                  <p className="mt-1 text-xl font-bold tabular-nums text-slate-900 sm:text-2xl">{selectedProject.memberNames.length}</p>
+                  <p className="text-[11px] font-medium text-slate-400 sm:text-xs">
+                    Team members
+                  </p>
+                  <p className="mt-1 text-xl font-bold tabular-nums text-slate-900 sm:text-2xl">
+                    {selectedProject.members?.length || 0}
+                  </p>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1.65fr)_minmax(280px,0.85fr)] xl:gap-6">
-                {/* Tasks */}
+                {/* PROJECT TASKS */}
                 <section className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white">
-                  <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-4 sm:px-5">
+                  <div className="flex flex-col gap-3 border-b border-slate-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
                     <div>
-                      <h4 className="text-base font-bold text-slate-900">Project tasks</h4>
-                      <p className="mt-1 text-xs text-slate-400">Tasks and the people assigned to them</p>
+                      <h4 className="text-base font-bold text-slate-900">
+                        Project tasks
+                      </h4>
+                      <p className="mt-1 text-xs text-slate-400">
+                        Tasks and the people assigned to them
+                      </p>
                     </div>
-                    <span className="shrink-0 rounded-lg bg-slate-100 px-2.5 py-1.5 text-xs font-semibold text-slate-600">
-                      {getProjectTasks(selectedProject).length} tasks
-                    </span>
+
+                    <div className="flex items-center gap-2">
+                      <span className="shrink-0 rounded-lg bg-slate-100 px-2.5 py-1.5 text-xs font-semibold text-slate-600">
+                        {getTasks(selectedProject).length} tasks
+                      </span>
+
+                      {canCreateTask(selectedProject, currentUser.id) && (
+                        <button
+                          type="button"
+                          onClick={startCreateTask}
+                          className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-indigo-600 px-3 text-xs font-semibold text-white transition hover:bg-indigo-700"
+                        >
+                          <Plus size={15} />
+                          Create Task
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   <div className="divide-y divide-slate-100">
-                    {getProjectTasks(selectedProject).map((task) => (
-                      <div key={task.id} className="px-4 py-4 transition hover:bg-slate-50/70 sm:px-5">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="break-words text-sm font-semibold text-slate-800">{task.title}</p>
-                            {task.description && (
-                              <p className="mt-1 text-xs leading-5 text-slate-500">{task.description}</p>
-                            )}
-                            <div className="mt-2 flex flex-wrap items-center gap-2">
-                              <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${taskStatusStyles[task.status] || taskStatusStyles["To do"]}`}>
-                                {task.status}
-                              </span>
-                              <PriorityBadge priority={task.priority} />
+                    {getTasks(selectedProject).map((task) => {
+                      const assignee = getMember(
+                        selectedProject,
+                        task.assignedTo
+                      );
+
+                      const displayStatus = getTaskStatus(task);
+
+                      return (
+                        <div
+                          key={task.id}
+                          className="px-4 py-4 transition hover:bg-slate-50/70 sm:px-5"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="break-words text-sm font-semibold text-slate-800">
+                                {task.title}
+                              </p>
+
+                              {task.description && (
+                                <p className="mt-1 text-xs leading-5 text-slate-500">
+                                  {task.description}
+                                </p>
+                              )}
+
+                              <div className="mt-2 flex flex-wrap items-center gap-2">
+                                <span
+                                  className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                                    taskStatusStyles[displayStatus] ||
+                                    taskStatusStyles["To do"]
+                                  }`}
+                                >
+                                  {displayStatus}
+                                </span>
+
+                                <PriorityBadge priority={task.priority} />
+                              </div>
                             </div>
+
+                            <span className="shrink-0 whitespace-nowrap text-[11px] text-slate-400 sm:text-xs">
+                              {formatDate(task.dueDate)}
+                            </span>
                           </div>
-                          <span className="shrink-0 whitespace-nowrap text-[11px] text-slate-400 sm:text-xs">
-                            {formatDate(task.dueDate)}
-                          </span>
+
+                          <div className="mt-3 flex flex-wrap items-center gap-2">
+                            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-[10px] font-bold text-indigo-700">
+                              {getInitials(assignee?.name || "Unknown")}
+                            </div>
+
+                            <span className="min-w-0 truncate text-xs font-medium text-slate-600">
+                              {assignee?.name || "Unknown member"}
+                            </span>
+
+                            <span className="text-xs text-slate-300">·</span>
+
+                            <span className="text-xs text-slate-400">
+                              Assignee
+                            </span>
+
+                            {/* OWNER / ADMIN TASK CONTROLS */}
+                            {canManageProject(selectedProject, currentUser.id) && (
+                              <div className="ml-auto flex items-center gap-2">
+                                <select
+                                  aria-label={`Update status for ${task.title}`}
+                                  value={task.status}
+                                  onChange={(event) =>
+                                    updateTaskStatus(
+                                      task.id,
+                                      event.target.value
+                                    )
+                                  }
+                                  className="h-8 max-w-[145px] rounded-lg border border-slate-200 bg-white px-2 text-xs font-medium text-slate-600 outline-none focus:border-indigo-400"
+                                >
+                                  <option>To do</option>
+                                  <option>In progress</option>
+                                  <option>Completed</option>
+                                </select>
+
+                                {/* DELETE TASK BUTTON */}
+                                <button
+                                  type="button"
+                                  onClick={() => requestDeleteTask(task)}
+                                  title="Delete task"
+                                  aria-label={`Delete ${task.title}`}
+                                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-red-50 hover:text-red-600"
+                                >
+                                  <Trash2 size={15} />
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    {getTasks(selectedProject).length === 0 && (
+                      <div className="px-5 py-10 text-center">
+                        <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-slate-100 text-slate-400">
+                          <CheckCircle2 size={20} />
                         </div>
 
-                        <div className="mt-3 flex items-center gap-2">
-                          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-[10px] font-bold text-indigo-700">
-                            {task.assignee.split(" ").map((part) => part[0]).slice(0, 2).join("").toUpperCase()}
-                          </div>
-                          <span className="min-w-0 truncate text-xs font-medium text-slate-600">{task.assignee}</span>
-                          <span className="text-xs text-slate-300">·</span>
-                          <span className="text-xs text-slate-400">Assignee</span>
-                        </div>
-                      </div>
-                    ))}
-                    {getProjectTasks(selectedProject).length === 0 && (
-                      <div className="px-5 py-10 text-center">
-                        <p className="text-sm font-semibold text-slate-700">No tasks yet</p>
-                        <p className="mt-1 text-xs text-slate-400">Tasks added to this project will appear here.</p>
+                        <p className="text-sm font-semibold text-slate-700">
+                          No tasks yet
+                        </p>
+
+                        <p className="mt-1 text-xs text-slate-400">
+                          Create the first task to get this project moving.
+                        </p>
+
+                        {canCreateTask(selectedProject, currentUser.id) && (
+                          <button
+                            type="button"
+                            onClick={startCreateTask}
+                            className="mt-4 inline-flex h-9 items-center gap-2 rounded-lg bg-indigo-600 px-3 text-xs font-semibold text-white hover:bg-indigo-700"
+                          >
+                            <Plus size={14} />
+                                                        Create first task
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
 
                   <div className="border-t border-slate-100 bg-slate-50/70 px-4 py-3 sm:px-5">
                     <p className="text-xs text-slate-400">
-                      {getProjectTasks(selectedProject).length} tasks in this project
+                      {getTasks(selectedProject).length} tasks in this project
                     </p>
                   </div>
                 </section>
 
-                {/* Project information and members */}
+                {/* PROJECT INFO + MEMBERS */}
                 <div className="space-y-5">
                   <section className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
                     <div className="mb-4 flex items-center justify-between">
-                      <h4 className="text-base font-bold text-slate-900">Project overview</h4>
+                      <h4 className="text-base font-bold text-slate-900">
+                        Project overview
+                      </h4>
                       <Target size={18} className="text-indigo-500" />
                     </div>
+
                     <div className="mb-2 flex items-center justify-between gap-3">
-                      <span className="text-xs font-medium text-slate-500">Progress</span>
-                      <span className="text-sm font-bold tabular-nums text-indigo-600">{getProjectProgress(selectedProject)}%</span>
+                      <span className="text-xs font-medium text-slate-500">
+                        Progress
+                      </span>
+                      <span className="text-sm font-bold tabular-nums text-indigo-600">
+                        {getProgress(selectedProject)}%
+                      </span>
                     </div>
-                    <ProgressBar value={getProjectProgress(selectedProject)} color={selectedProject.color} />
+
+                    <ProgressBar
+                      value={getProgress(selectedProject)}
+                      color={selectedProject.color}
+                    />
+
                     <div className="mt-5 space-y-3">
-                      <DetailLine icon={<BriefcaseBusiness size={16} />} label="Category" value={selectedProject.category} />
-                      <DetailLine icon={<Crown size={16} />} label="Project owner" value={selectedProject.owner} />
-                      <DetailLine icon={<CalendarDays size={16} />} label="Deadline" value={formatDate(selectedProject.deadline)} />
-                      <DetailLine icon={<Clock3 size={16} />} label="Created" value={formatDate(selectedProject.createdAt)} />
+                      <DetailLine
+                        icon={<BriefcaseBusiness size={16} />}
+                        label="Category"
+                        value={selectedProject.category}
+                      />
+
+                      <DetailLine
+                        icon={<Flag size={16} />}
+                        label="Priority"
+                        value={selectedProject.priority}
+                      />
+
+                      <DetailLine
+                        icon={<CalendarDays size={16} />}
+                        label="Deadline"
+                        value={formatDate(selectedProject.deadline)}
+                      />
+
+                      <DetailLine
+                        icon={<Clock3 size={16} />}
+                        label="Created"
+                        value={formatDate(selectedProject.createdAt)}
+                      />
                     </div>
                   </section>
 
                   <section className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
                     <div className="mb-4 flex items-center justify-between gap-3">
                       <div>
-                        <h4 className="text-base font-bold text-slate-900">Project members</h4>
-                        <p className="mt-1 text-xs text-slate-400">People working on this project</p>
+                        <h4 className="text-base font-bold text-slate-900">
+                          Project members
+                        </h4>
+                        <p className="mt-1 text-xs text-slate-400">
+                          People working on this project
+                        </p>
                       </div>
+
                       <span className="rounded-lg bg-indigo-50 px-2.5 py-1.5 text-xs font-semibold text-indigo-600">
-                        {selectedProject.memberNames.length} members
+                        {selectedProject.members?.length || 0} members
                       </span>
                     </div>
 
                     <div className="space-y-3">
-                      {selectedProject.memberNames.map((name, index) => {
-                        const assignedCount = getProjectTasks(selectedProject).filter((task) => task.assignee === name).length;
-                        const isOwner = selectedProject.owner === name;
-                        return (
-                          <div key={name} className="flex items-center gap-3">
-                            <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold ${["bg-indigo-100 text-indigo-700", "bg-purple-100 text-purple-700", "bg-sky-100 text-sky-700", "bg-emerald-100 text-emerald-700"][index % 4]}`}>
-                              {name.split(" ").map((part) => part[0]).slice(0, 2).join("").toUpperCase()}
+                      {(selectedProject.members || []).map(
+                        (member, index) => {
+                          const assignedCount = getTasks(
+                            selectedProject
+                          ).filter(
+                            (task) => task.assignedTo === member.userId
+                          ).length;
+
+                          return (
+                            <div
+                              key={member.userId}
+                              className="flex items-center gap-3"
+                            >
+                              <div
+                                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                                  [
+                                    "bg-indigo-100 text-indigo-700",
+                                    "bg-purple-100 text-purple-700",
+                                    "bg-sky-100 text-sky-700",
+                                    "bg-emerald-100 text-emerald-700",
+                                  ][index % 4]
+                                }`}
+                              >
+                                {getInitials(member.name || "Member")}
+                              </div>
+
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate text-sm font-semibold text-slate-800">
+                                  {member.name || "Team member"}
+                                  {member.userId === currentUser.id
+                                    ? " (You)"
+                                    : ""}
+                                </p>
+
+                                <p className="text-xs capitalize text-slate-400">
+                                  {member.role} · {assignedCount}{" "}
+                                  {assignedCount === 1 ? "task" : "tasks"} assigned
+                                </p>
+                              </div>
+
+                              {member.role === "owner" ? (
+                                <Crown
+                                  size={15}
+                                  className="shrink-0 text-amber-500"
+                                />
+                              ) : member.role === "admin" ? (
+                                <ShieldCheck
+                                  size={15}
+                                  className="shrink-0 text-indigo-500"
+                                />
+                              ) : (
+                                <UserRound
+                                  size={15}
+                                  className="shrink-0 text-slate-300"
+                                />
+                              )}
                             </div>
-                            <div className="min-w-0 flex-1">
-                              <p className="truncate text-sm font-semibold text-slate-800">{name}</p>
-                              <p className="text-xs text-slate-400">{isOwner ? "Project owner" : `${assignedCount} ${assignedCount === 1 ? "task" : "tasks"} assigned`}</p>
-                            </div>
-                            {isOwner && <Crown size={15} className="shrink-0 text-amber-500" />}
-                          </div>
-                        );
-                      })}
+                          );
+                        }
+                      )}
                     </div>
                   </section>
                 </div>
               </div>
 
-              <div className="mt-6 flex justify-end border-t border-slate-100 pt-5">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowDetailsModal(false);
-                    startEdit(selectedProject);
-                  }}
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 px-4 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
-                >
-                  <Pencil size={15} />
-                  Edit project
-                </button>
+              <div className="mt-6 flex flex-col-reverse justify-between gap-3 border-t border-slate-100 pt-5 sm:flex-row">
+                <p className="self-center text-xs text-slate-400">
+                  {canCreateTask(selectedProject, currentUser.id)
+                    ? "You can create and manage tasks in this project."
+                    : "You have member access. An owner or admin can create project tasks."}
+                </p>
 
+                {canManageProject(selectedProject, currentUser.id) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowDetailsModal(false);
+                      startEditProject(selectedProject);
+                    }}
+                    className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 px-4 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+                  >
+                    <Pencil size={15} />
+                    Edit project
+                  </button>
+                )}
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Delete confirmation */}
-      {deleteTarget && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm">
+      {/* CREATE PROJECT TASK MODAL */}
+      {showTaskModal && selectedProject && (
+        <div
+          className="fixed inset-0 z-[130] flex items-center justify-center overflow-y-auto bg-slate-950/60 p-4 backdrop-blur-sm"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              setShowTaskModal(false);
+            }
+          }}
+        >
+          <div className="my-auto w-full max-w-lg rounded-2xl bg-white p-5 shadow-2xl sm:p-7">
+            <div className="mb-6 flex items-start justify-between gap-3">
+              <div>
+                <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
+                  <Plus size={20} />
+                </div>
+
+                <h3 className="text-xl font-bold text-slate-900">
+                  Create project task
+                </h3>
+
+                <p className="mt-1 text-sm text-slate-500">
+                  Add a task to{" "}
+                  <span className="font-semibold text-slate-700">
+                    {selectedProject.name}
+                  </span>
+                  .
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowTaskModal(false)}
+                aria-label="Close task form"
+                className="rounded-lg p-2 text-slate-400 hover:bg-slate-100"
+              >
+                <X size={19} />
+              </button>
+            </div>
+
+            <form
+              onSubmit={handleCreateProjectTask}
+              className="space-y-4"
+            >
+              <div>
+                <label
+                  htmlFor="project-task-title"
+                  className="mb-2 block text-sm font-semibold text-slate-700"
+                >
+                  Task title *
+                </label>
+
+                <input
+                  id="project-task-title"
+                  required
+                  autoFocus
+                  value={taskForm.title}
+                  onChange={(event) =>
+                    setTaskForm({
+                      ...taskForm,
+                      title: event.target.value,
+                    })
+                  }
+                  placeholder="e.g. Build project settings page"
+                  className="h-12 w-full rounded-xl border border-slate-200 px-3 text-base outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50 sm:text-sm"
+                />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="project-task-description"
+                  className="mb-2 block text-sm font-semibold text-slate-700"
+                >
+                  Description
+                </label>
+
+                <textarea
+                  id="project-task-description"
+                  rows={3}
+                  value={taskForm.description}
+                  onChange={(event) =>
+                    setTaskForm({
+                      ...taskForm,
+                      description: event.target.value,
+                    })
+                  }
+                  placeholder="Describe what needs to be done..."
+                  className="w-full resize-y rounded-xl border border-slate-200 p-3 text-base outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50 sm:text-sm"
+                />
+              </div>
+
+              {/* Project is fixed: no Personal / No Project option. */}
+              <div className="rounded-xl border border-indigo-100 bg-indigo-50/70 px-3.5 py-3">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-indigo-500">
+                  Project
+                </p>
+
+                <p className="mt-1 text-sm font-semibold text-indigo-900">
+                  {selectedProject.name}
+                </p>
+
+                <p className="mt-1 text-xs text-indigo-600">
+                  This task will be created inside this project.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <label
+                    htmlFor="project-task-assignee"
+                    className="mb-2 block text-sm font-semibold text-slate-700"
+                  >
+                    Assign to *
+                  </label>
+
+                  <select
+                    id="project-task-assignee"
+                    required
+                    value={taskForm.assignedTo}
+                    onChange={(event) =>
+                      setTaskForm({
+                        ...taskForm,
+                        assignedTo: event.target.value,
+                      })
+                    }
+                    className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-indigo-500"
+                  >
+                    <option value="" disabled>
+                      Select a project member
+                    </option>
+
+                    {(selectedProject.members || []).map((member) => (
+                      <option
+                        key={member.userId}
+                        value={member.userId}
+                      >
+                        {member.name || "Team member"}
+                        {member.userId === currentUser.id
+                          ? " (You)"
+                          : ""}{" "}
+                        · {member.role}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="project-task-priority"
+                    className="mb-2 block text-sm font-semibold text-slate-700"
+                  >
+                    Priority
+                  </label>
+
+                  <select
+                    id="project-task-priority"
+                    value={taskForm.priority}
+                    onChange={(event) =>
+                      setTaskForm({
+                        ...taskForm,
+                        priority: event.target.value,
+                      })
+                    }
+                    className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-indigo-500"
+                  >
+                    <option>Low</option>
+                    <option>Medium</option>
+                    <option>High</option>
+                    <option>Urgent</option>
+                  </select>
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label
+                    htmlFor="project-task-due-date"
+                    className="mb-2 block text-sm font-semibold text-slate-700"
+                  >
+                    Due date
+                  </label>
+
+                  <input
+                    id="project-task-due-date"
+                    type="date"
+                    min={todayString()}
+                    value={taskForm.dueDate}
+                    onChange={(event) =>
+                      setTaskForm({
+                        ...taskForm,
+                        dueDate: event.target.value,
+                      })
+                    }
+                    className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-indigo-500"
+                  />
+                </div>
+              </div>
+
+              <div className="rounded-xl bg-slate-50 px-3 py-2.5 text-xs text-slate-500">
+                New tasks start as{" "}
+                <span className="font-semibold text-slate-700">
+                  To do
+                </span>
+                . The creator and creation date are added automatically.
+              </div>
+
+              <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={() => setShowTaskModal(false)}
+                  className="h-11 rounded-xl border border-slate-200 px-5 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-6 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <Plus size={16} />
+                  {saving ? "Creating..." : "Create task"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* DELETE TASK CONFIRMATION */}
+      {deleteTaskTarget && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
           <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl">
             <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-red-50 text-red-600">
               <Trash2 size={20} />
             </div>
+
+            <h3 className="text-lg font-bold text-slate-900">
+              Delete this task?
+            </h3>
+
+            <p className="mt-2 text-sm leading-6 text-slate-500">
+              Are you sure you want to delete{" "}
+              <span className="font-semibold text-slate-700">
+                {deleteTaskTarget.title}
+              </span>
+              ? This action cannot be undone.
+            </p>
+
+            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setDeleteTaskTarget(null)}
+                className="h-10 rounded-xl border border-slate-200 px-4 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={confirmDeleteTask}
+                className="h-10 rounded-xl bg-red-600 px-4 text-sm font-semibold text-white hover:bg-red-700"
+              >
+                Delete task
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DELETE PROJECT CONFIRMATION */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-[140] flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl">
+            <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-red-50 text-red-600">
+              <Trash2 size={20} />
+            </div>
+
             <h3 className="text-lg font-bold text-slate-900">
               Delete this project?
             </h3>
+
             <p className="mt-2 text-sm leading-6 text-slate-500">
               <span className="font-semibold text-slate-700">
                 {deleteTarget.name}
               </span>{" "}
-              will be removed from this demo workspace. This action cannot be
-              undone.
+              will be permanently deleted, including all tasks belonging to it. This action cannot be undone.
             </p>
+
             <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
               <button
                 type="button"
@@ -1586,6 +2349,7 @@ export default function ProjectsPage() {
               >
                 Cancel
               </button>
+
               <button
                 type="button"
                 onClick={confirmDelete}
@@ -1598,40 +2362,20 @@ export default function ProjectsPage() {
         </div>
       )}
 
-      {/* Toast */}
+      {/* TOAST */}
       {notice && (
         <div
           role="status"
           aria-live="polite"
-          className="fixed bottom-5 right-5 z-[150] flex max-w-[calc(100vw-2rem)] items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 shadow-xl"
+          className="fixed bottom-5 right-5 z-[160] flex max-w-[calc(100vw-2rem)] items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 shadow-xl"
         >
-          <CheckCircle2 size={18} className="shrink-0 text-emerald-600" />
+          <CheckCircle2
+            size={18}
+            className="shrink-0 text-emerald-600"
+          />
           {notice}
         </div>
       )}
     </main>
-  );
-}
-
-function DetailMetric({ label, value }) {
-  return (
-    <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
-      <p className="text-xs text-slate-400">{label}</p>
-      <p className="mt-2 text-lg font-extrabold text-slate-900">{value}</p>
-    </div>
-  );
-}
-
-function DetailLine({ icon, label, value }) {
-  return (
-    <div className="flex items-center justify-between gap-3">
-      <div className="flex items-center gap-2 text-sm text-slate-500">
-        {icon}
-        {label}
-      </div>
-      <span className="max-w-[55%] truncate text-right text-sm font-semibold text-slate-800">
-        {value}
-      </span>
-    </div>
   );
 }

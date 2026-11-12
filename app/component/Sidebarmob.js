@@ -4,6 +4,7 @@
 import { signOut, useSession } from "next-auth/react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 const navigation = [
   {
@@ -33,6 +34,8 @@ const navigation = [
 ];
 
 const Sidebarmob = ({ active }) => {
+  const router = useRouter();
+
   const { data: session } = useSession();
 
   const handleSignOut = async () => {
@@ -127,7 +130,7 @@ const Sidebarmob = ({ active }) => {
           className="flex h-12 w-12 items-center justify-center rounded-xl border border-white/10 bg-white/5"
         >
           {session?.user?.image ? (
-            <Image
+            <Image onClick={() => router.push("/setting")}
               src={session.user.image}
               alt="Profile"
               width={38}

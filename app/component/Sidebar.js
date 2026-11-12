@@ -165,7 +165,7 @@ const Sidebar = ({ active }) => {
                 unoptimized
               />
             ) : (
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 text-sm font-bold text-white shadow-md">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-linear-to-br from-blue-500 to-cyan-500 text-sm font-bold text-white shadow-md">
                 {initials}
               </div>
             )}
@@ -185,9 +185,9 @@ const Sidebar = ({ active }) => {
 
             {/* Settings */}
             <Link
-              href="/settings"
-              aria-label="Settings"
-              title="Settings"
+              href="/setting"
+              aria-label="Setting"
+              title="Setting"
               className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-all hover:bg-white/10 hover:text-cyan-400 active:scale-95"
             >
               <Image

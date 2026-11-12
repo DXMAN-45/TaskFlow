@@ -1,225 +1,276 @@
+
 import { NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
-import clientPromise from "@/lib/mongodb";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/authOptions";
 
-// Create a new task for the logged-in user.
-export async function POST(request) {
-    try {
-        // Check if the user is authenticated before allowing task creation.
-        const session = await getServerSession(authOptions);
+import clientPromise from "../../../lib/mongodb";
+import { getCurrentUser } from "../../../lib/auth";
+import {
+  isValidObjectId,
+  getProjectRole,
+  canCreateProjectTask,
+} from "../../../lib/permissions";
 
-        if (!session?.user?.id) {
-            return NextResponse.json(
-                { message: "You must be logged in to create a task" },
-                { status: 401 }
-            );
-        }
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
-        // Read the incoming JSON payload from the client.
-        let data;
+const DB_NAME = "taskflow";
 
-        try {
-            data = await request.json();
-        } catch {
-            return NextResponse.json(
-                { message: "Invalid JSON request body" },
-                { status: 400 }
-            );
-        }
+const allowedPriorities = ["Low", "Medium", "High", "Urgent"];
 
-        // Validate the required fields before saving into MongoDB.
-        if (typeof data.title !== "string" || data.title.trim() === "") {
-            return NextResponse.json({ message: "Title is required" }, { status: 400 });
-        }
-        if (data.description != null && typeof data.description !== "string") {
-            return NextResponse.json({ message: "Description must be a string" }, { status: 400 });
-        }
+function validateTask(body) {
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return "Invalid request body.";
+  }
 
-        const title = data.title.trim();
-        const description = data.description == null ? "" : data.description.trim();
+  if (
+    typeof body.title !== "string" ||
+    !body.title.trim()
+  ) {
+    return "Task title is required.";
+  }
 
-        // Store the task with the user ID so that each user sees only their own tasks.
-        const task = {
-            title,
-            description,
-            completed: false,
-            userId: session.user.id,
-            createdAt: new Date(),
-        };
+  if (body.title.trim().length > 150) {
+    return "Task title cannot exceed 150 characters.";
+  }
 
-        const client = await clientPromise;
-        const db = client.db("taskflow");
-        const collection = db.collection("tasks");
-        const result = await collection.insertOne(task);
+  if (
+    body.description !== undefined &&
+    (typeof body.description !== "string" ||
+      body.description.length > 3000)
+  ) {
+    return "Invalid task description.";
+  }
 
-        return NextResponse.json({ message: "Task created successfully", id: result.insertedId }, { status: 201 });
-    } catch (error) {
-        console.error("Error creating task:", error);
-        return NextResponse.json({ message: "Error creating task" }, { status: 500 });
+  if (
+    body.priority !== undefined &&
+    !allowedPriorities.includes(body.priority)
+  ) {
+    return "Invalid task priority.";
+  }
+
+  if (
+    body.dueDate !== undefined &&
+    body.dueDate !== null &&
+    body.dueDate !== ""
+  ) {
+    if (
+      typeof body.dueDate !== "string" ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(body.dueDate)
+    ) {
+      return "Due date must use YYYY-MM-DD format.";
     }
+
+    const date = new Date(`${body.dueDate}T00:00:00.000Z`);
+
+    if (
+      Number.isNaN(date.getTime()) ||
+      date.toISOString().slice(0, 10) !== body.dueDate
+    ) {
+      return "Invalid due date.";
+    }
+  }
+
+  return null;
 }
 
-// Fetch all tasks from the database.
+// GET: Fetch personal and project tasks
 export async function GET() {
-    try {
-        const session = await getServerSession(authOptions);
+  try {
+    const user = await getCurrentUser();
 
-        if (!session?.user?.id) {
-            return NextResponse.json(
-                { message: "You must be logged in to view tasks" },
-                { status: 401 }
-            );
-        }
-        const client = await clientPromise;
-        const db = client.db("taskflow");
-        const collection = db.collection("tasks");
-        const tasks = await collection.find({ userId: session.user.id }).toArray();
-        return NextResponse.json(tasks, { status: 200 });
-    } catch (error) {
-        console.error("Error fetching tasks:", error);
-        return NextResponse.json({ message: "Error fetching tasks" }, { status: 500 });
+    if (!user) {
+      return NextResponse.json(
+        { message: "Unauthorized." },
+        { status: 401 }
+      );
     }
+
+    const client = await clientPromise;
+    const db = client.db(DB_NAME);
+    const userId = new ObjectId(user.id);
+
+    // Find projects the current user belongs to.
+    const projects = await db.collection("projects")
+      .find({
+        $or: [
+          { ownerId: userId },
+          { "members.userId": userId },
+        ],
+      })
+      .project({ _id: 1 })
+      .toArray();
+
+    const projectIds = projects.map((project) => project._id);
+
+    const tasks = await db.collection("tasks")
+      .find({
+        $or: [
+          { createdBy: userId, projectId: null },
+          { projectId: { $in: projectIds } },
+        ],
+      })
+      .sort({ createdAt: -1 })
+      .toArray();
+
+    const today = new Date().toISOString().slice(0, 10);
+
+    const formattedTasks = tasks.map((task) => {
+      const dueDate = task.dueDate || null;
+
+      const isOverdue =
+        dueDate &&
+        dueDate < today &&
+        task.status !== "Completed";
+
+      return {
+        ...task,
+        overdue: Boolean(isOverdue),
+      };
+    });
+
+    return NextResponse.json(
+      { tasks: formattedTasks },
+      { status: 200 }
+    );
+  } catch (error) {
+    console.error("GET /api/tasks error:", error);
+
+    return NextResponse.json(
+      { message: "Unable to fetch tasks." },
+      { status: 500 }
+    );
+  }
 }
 
-// Update an existing task by its MongoDB ObjectId.
-export async function PATCH(request) {
-    try {
+// POST: Create a personal or project task
+export async function POST(request) {
+  try {
+    const user = await getCurrentUser();
 
-        // Check if the user is authenticated before allowing task creation.
-        const session = await getServerSession(authOptions);
+    if (!user) {
+      return NextResponse.json(
+        { message: "Unauthorized." },
+        { status: 401 }
+      );
+    }
 
-        if (!session?.user?.id) {
-            return NextResponse.json(
-                { message: "You must be logged in to update tasks" },
-                { status: 401 }
-            );
-        }
-        let data;
+    const body = await request.json();
 
-        try {
-            data = await request.json();
-        } catch {
-            return NextResponse.json(
-                { message: "Invalid JSON request body" },
-                { status: 400 }
-            );
-        }
+    const validationError = validateTask(body);
 
-        if (!data || typeof data !== "object") {
-            return NextResponse.json({ message: "Invalid request body" }, { status: 400 });
-        }
+    if (validationError) {
+      return NextResponse.json(
+        { message: validationError },
+        { status: 400 }
+      );
+    }
 
-        const { id, title, description, completed } = data;
+    const client = await clientPromise;
+    const db = client.db(DB_NAME);
 
-        // Ensure the ID is a valid MongoDB ObjectId.
-        if (typeof id !== "string" || !ObjectId.isValid(id)) {
-            return NextResponse.json({ message: "Valid task ID is required" }, { status: 400 });
-        }
+    const userId = new ObjectId(user.id);
+    const now = new Date();
 
-        // Prevent users from altering protected fields like _id and createdAt.
-        if ("_id" in data || "createdAt" in data) {
-            return NextResponse.json({ message: "Cannot update _id or createdAt" }, { status: 400 });
-        }
+    let projectId = null;
+    let assignedTo = userId;
 
-        const updateFields = {};
+    // Personal task: always belongs to the logged-in user.
+    if (body.projectId === undefined || body.projectId === null || body.projectId === "") {
+      projectId = null;
+      assignedTo = userId;
+    } else {
+      // Project task: validate the project ID.
+      if (!isValidObjectId(body.projectId)) {
+        return NextResponse.json(
+          { message: "Invalid project ID." },
+          { status: 400 }
+        );
+      }
 
-        // Only update the fields that are actually present in the request.
-        if (title !== undefined) {
-            if (typeof title !== "string" || title.trim() === "") {
-                return NextResponse.json({ message: "Title must be a non-empty string" }, { status: 400 });
-            }
-            updateFields.title = title.trim();
-        }
+      projectId = new ObjectId(body.projectId);
 
-        if (description !== undefined) {
-            if (typeof description !== "string") {
-                return NextResponse.json({ message: "Description must be a string" }, { status: 400 });
-            }
-            updateFields.description = description.trim();
-        }
+      const project = await db.collection("projects").findOne({
+        _id: projectId,
+        $or: [
+          { ownerId: userId },
+          { "members.userId": userId },
+        ],
+      });
 
-        if (completed !== undefined) {
-            if (typeof completed !== "boolean") {
-                return NextResponse.json({ message: "Completed must be a boolean" }, { status: 400 });
-            }
-            updateFields.completed = completed;
-        }
+      if (!project) {
+        return NextResponse.json(
+          { message: "Project not found or access denied." },
+          { status: 404 }
+        );
+      }
 
-        if (Object.keys(updateFields).length === 0) {
-            return NextResponse.json({ message: "No valid fields provided to update" }, { status: 400 });
-        }
+      const role = getProjectRole(project, userId);
 
-        const client = await clientPromise;
-        const db = client.db("taskflow");
-        const collection = db.collection("tasks");
+      if (!canCreateProjectTask(role)) {
+        return NextResponse.json(
+          { message: "You do not have permission to create project tasks." },
+          { status: 403 }
+        );
+      }
 
-        const result = await collection.updateOne(
-            { _id: new ObjectId(id), userId: session.user.id },
-            { $set: updateFields },
+      // A project task must be assigned to a project member.
+      const requestedAssignee = body.assignedTo || user.id;
+
+      if (!isValidObjectId(requestedAssignee)) {
+        return NextResponse.json(
+          { message: "Invalid assignee ID." },
+          { status: 400 }
+        );
+      }
+
+      assignedTo = new ObjectId(requestedAssignee);
+
+      const isMember =
+        project.ownerId?.toString() === assignedTo.toString() ||
+        project.members?.some(
+          (member) => member.userId?.toString() === assignedTo.toString()
         );
 
-        if (result.matchedCount === 0) {
-            return NextResponse.json({ message: "Task not found" }, { status: 404 });
-        }
-
-        return NextResponse.json({ message: "Task updated successfully" }, { status: 200 });
-    } catch (error) {
-        console.error("Error updating task:", error);
-        return NextResponse.json({ message: "Error updating task" }, { status: 500 });
+      if (!isMember) {
+        return NextResponse.json(
+          { message: "Assignee must be a member of this project." },
+          { status: 400 }
+        );
+      }
     }
+
+    const task = {
+      title: body.title.trim(),
+      description: body.description?.trim() || "",
+      projectId,
+      assignedTo,
+      createdBy: userId,
+      priority: body.priority || "Medium",
+      status: "To do",
+      dueDate: body.dueDate || null,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    const result = await db.collection("tasks").insertOne(task);
+
+    return NextResponse.json(
+      {
+        message: "Task created successfully.",
+        task: {
+          ...task,
+          _id: result.insertedId,
+          overdue: false,
+        },
+      },
+      { status: 201 }
+    );
+  } catch (error) {
+    console.error("POST /api/tasks error:", error);
+
+    return NextResponse.json(
+      { message: "Unable to create task." },
+      { status: 500 }
+    );
+  }
 }
-
-// Delete a task by ID.
-export async function DELETE(request) {
-    try {
-        // Check if the user is authenticated before allowing task creation.
-        const session = await getServerSession(authOptions);
-
-        if (!session?.user?.id) {
-            return NextResponse.json(
-                { message: "You must be logged in to delete tasks" },
-                { status: 401 }
-            );
-        }
-        let data;
-
-        try {
-            data = await request.json();
-        } catch {
-            return NextResponse.json(
-                { message: "Invalid JSON request body" },
-                { status: 400 }
-            );
-        }
-        if (!data || typeof data !== "object") {
-            return NextResponse.json({ message: "Invalid request body" }, { status: 400 });
-        }
-
-        const { id } = data;
-
-        // Validate the MongoDB ID before deleting the record.
-        if (typeof id !== "string" || !ObjectId.isValid(id)) {
-            return NextResponse.json({ message: "Valid task ID is required" }, { status: 400 });
-        }
-
-        const client = await clientPromise;
-        const db = client.db("taskflow");
-        const collection = db.collection("tasks");
-
-        const result = await collection.deleteOne({ _id: new ObjectId(id), userId: session.user.id });
-
-        if (result.deletedCount === 0) {
-            return NextResponse.json({ message: "Task not found" }, { status: 404 });
-        }
-
-        return NextResponse.json({ message: "Task deleted successfully" }, { status: 200 });
-    } catch (error) {
-        console.error("Error deleting task:", error);
-        return NextResponse.json({ message: "Error deleting task" }, { status: 500 });
-    }
-}
-
-
-

@@ -1,79 +1,25 @@
 
 "use client";
 
-import React, { useMemo, useState } from "react";
-import Image from "next/image";
-import Link from "next/link";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Sidebar from "../component/Sidebar";
 import Sidebarmob from "../component/Sidebarmob";
 
-const initialTasks = [
-  {
-    id: 1,
-    title: "Redesign user profile",
-    description: "Update the profile layout and improve the user experience.",
-    project: "TaskFlow Website",
-    assignee: "You",
-    priority: "High",
-    status: "In progress",
-    dueDate: "2026-11-14",
-  },
-  {
-    id: 2,
-    title: "Create dashboard widgets",
-    description: "Build responsive cards for the dashboard overview.",
-    project: "TaskFlow Website",
-    assignee: "Riya",
-    priority: "Medium",
-    status: "In progress",
-    dueDate: "2026-11-16",
-  },
-  {
-    id: 3,
-    title: "Fix mobile navigation",
-    description: "Improve navigation spacing and mobile responsiveness.",
-    project: "Mobile Experience",
-    assignee: "You",
-    priority: "High",
-    status: "Overdue",
-    dueDate: "2026-11-09",
-  },
-  {
-    id: 4,
-    title: "Update authentication UI",
-    description: "Polish the login and account creation experience.",
-    project: "TaskFlow Website",
-    assignee: "Alex",
-    priority: "Low",
-    status: "Completed",
-    dueDate: "2026-11-10",
-  },
-  {
-    id: 5,
-    title: "Prepare project documentation",
-    description: "Document the main project workflows and components.",
-    project: "Documentation",
-    assignee: "You",
-    priority: "Medium",
-    status: "To do",
-    dueDate: "2026-11-18",
-  },
-  {
-    id: 6,
-    title: "Review invitation flow",
-    description: "Test the team invitation and acceptance experience.",
-    project: "Team Management",
-    assignee: "Riya",
-    priority: "High",
-    status: "In progress",
-    dueDate: "2026-11-20",
-  },
+// ==========================================
+// FILTERS AND STYLES
+// ==========================================
+
+const filters = [
+  "All tasks",
+  "To do",
+  "In progress",
+  "Completed",
+  "Overdue",
 ];
 
-const filters = ["All tasks", "To do", "In progress", "Completed", "Overdue"];
-
 const priorityStyles = {
-  High: "bg-rose-50 text-rose-700 ring-rose-100",
+  Urgent: "bg-rose-50 text-rose-700 ring-rose-100",
+  High: "bg-orange-50 text-orange-700 ring-orange-100",
   Medium: "bg-amber-50 text-amber-700 ring-amber-100",
   Low: "bg-slate-100 text-slate-600 ring-slate-200",
 };
@@ -85,6 +31,20 @@ const statusStyles = {
   Overdue: "bg-rose-50 text-rose-700",
 };
 
+// ==========================================
+// DATE HELPERS
+// ==========================================
+
+function getLocalDate() {
+  const today = new Date();
+
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const day = String(today.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
 function formatDate(value) {
   if (!value) return "No date";
 
@@ -95,52 +55,366 @@ function formatDate(value) {
   }).format(new Date(`${value}T00:00:00`));
 }
 
+function toDateOnly(value) {
+  if (!value) return null;
+
+  if (
+    typeof value === "string" &&
+    /^\d{4}-\d{2}-\d{2}$/.test(value)
+  ) {
+    return value;
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) return null;
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
+// ==========================================
+// OVERDUE CALCULATION
+// ==========================================
+
 function isOverdue(task) {
-  if (task.status === "Completed" || !task.dueDate) return false;
+  if (task.status === "Completed" || !task.dueDate) {
+    return false;
+  }
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  return new Date(`${task.dueDate}T00:00:00`) < today;
+  return task.dueDate < getLocalDate();
 }
 
 function getStatus(task) {
   return isOverdue(task) ? "Overdue" : task.status;
 }
 
-function TaskPage() {
-  const [tasks, setTasks] = useState(initialTasks);
+// ==========================================
+// MAIN TASK PAGE
+// ==========================================
+
+export default function TaskPage() {
+  const [tasks, setTasks] = useState([]);
+  const [projects, setProjects] = useState([]);
+
+  const [currentUserId, setCurrentUserId] = useState("");
+  const [currentUserName, setCurrentUserName] = useState("You");
+
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const [pageError, setPageError] = useState("");
+
   const [activeFilter, setActiveFilter] = useState("All tasks");
   const [search, setSearch] = useState("");
+
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState(null);
+  const [taskToDelete, setTaskToDelete] = useState(null);
+
   const [formError, setFormError] = useState("");
+
+  // ========================================
+  // CREATE TASK FORM
+  // ========================================
 
   const [form, setForm] = useState({
     title: "",
     description: "",
     project: "",
-    assignee: "You",
+    assignedTo: "",
     priority: "Medium",
-    status: "To do",
     dueDate: "",
   });
+
+  // ========================================
+  // LOAD TASKS, PROJECTS AND SESSION
+  // ========================================
+
+  const loadPageData = useCallback(async () => {
+    setIsLoading(true);
+    setPageError("");
+
+    try {
+      const [
+        tasksResponse,
+        projectsResponse,
+        sessionResponse,
+      ] = await Promise.all([
+        fetch("/api/tasks", { cache: "no-store" }),
+        fetch("/api/projects", { cache: "no-store" }),
+        fetch("/api/auth/session", { cache: "no-store" }),
+      ]);
+
+      const [
+        tasksData,
+        projectsData,
+        sessionData,
+      ] = await Promise.all([
+        tasksResponse.json(),
+        projectsResponse.json(),
+        sessionResponse.json(),
+      ]);
+
+      if (!tasksResponse.ok) {
+        throw new Error(
+          tasksData.message || "Unable to load tasks."
+        );
+      }
+
+      if (!projectsResponse.ok) {
+        throw new Error(
+          projectsData.message || "Unable to load projects."
+        );
+      }
+
+      const userId = sessionData?.user?.id;
+
+      if (!userId) {
+        throw new Error(
+          "Your session could not be verified. Please sign in again."
+        );
+      }
+
+      const userName =
+        sessionData.user.name ||
+        sessionData.user.email ||
+        "You";
+
+      const loadedProjects = projectsData.projects || [];
+
+      const projectById = new Map(
+        loadedProjects.map((project) => [
+          String(project._id),
+          project,
+        ])
+      );
+
+      const normalizedTasks = (tasksData.tasks || []).map(
+        (task) => {
+          const project = task.projectId
+            ? projectById.get(String(task.projectId))
+            : null;
+
+          const members = project?.members || [];
+
+          const assignee = members.find(
+            (member) =>
+              String(member.userId) ===
+              String(task.assignedTo)
+          );
+
+          const creator = members.find(
+            (member) =>
+              String(member.userId) ===
+              String(task.createdBy)
+          );
+
+          return {
+            id: String(task._id),
+            title: task.title,
+            description: task.description || "",
+
+            projectId: task.projectId
+              ? String(task.projectId)
+              : null,
+
+            project: project?.name || null,
+
+            assignedToId: String(task.assignedTo || ""),
+
+            assignedTo:
+              String(task.assignedTo) === String(userId)
+                ? userName
+                : assignee?.name || "Project member",
+
+            createdById: String(task.createdBy || ""),
+
+            createdBy:
+              String(task.createdBy) === String(userId)
+                ? userName
+                : creator?.name || "Project member",
+
+            priority: task.priority || "Medium",
+            status: task.status || "To do",
+            dueDate: task.dueDate || null,
+            createdAt: toDateOnly(task.createdAt),
+            overdue: Boolean(task.overdue),
+          };
+        }
+      );
+
+      setCurrentUserId(String(userId));
+      setCurrentUserName(userName);
+      setProjects(loadedProjects);
+      setTasks(normalizedTasks);
+
+      setForm((current) => ({
+        ...current,
+        assignedTo: current.project
+          ? current.assignedTo
+          : String(userId),
+      }));
+    } catch (error) {
+      console.error("Task page loading error:", error);
+
+      setPageError(
+        error.message ||
+        "Something went wrong while loading tasks."
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadPageData();
+  }, [loadPageData]);
+
+  // ========================================
+  // PROJECT MEMBERS AND PERMISSIONS
+  // ========================================
+
+  const getProjectById = (projectId) =>
+    projects.find(
+      (project) =>
+        String(project._id) === String(projectId)
+    );
+
+  const getProjectRole = (projectId) => {
+    if (!projectId || !currentUserId) return null;
+
+    const project = getProjectById(projectId);
+
+    if (!project) return null;
+
+    if (
+      String(project.ownerId) === currentUserId
+    ) {
+      return "owner";
+    }
+
+    const membership = project.members?.find(
+      (member) =>
+        String(member.userId) === currentUserId
+    );
+
+    return membership?.role || null;
+  };
+
+  const canCreateTaskInProject = (projectId) => {
+    if (!projectId) return true;
+
+    const role = getProjectRole(projectId);
+
+    return role === "owner" || role === "admin";
+  };
+
+  const getAvailableAssignees = (projectId) => {
+    if (!projectId) {
+      return currentUserId
+        ? [
+            {
+              userId: currentUserId,
+              name: currentUserName,
+            },
+          ]
+        : [];
+    }
+
+    const project = getProjectById(projectId);
+
+    if (!project) return [];
+
+    const members = [...(project.members || [])];
+
+    if (
+      project.ownerId &&
+      !members.some(
+        (member) =>
+          String(member.userId) ===
+          String(project.ownerId)
+      )
+    ) {
+      members.unshift({
+        userId: project.ownerId,
+        name:
+          project.ownerId === currentUserId
+            ? currentUserName
+            : "Project owner",
+        role: "owner",
+      });
+    }
+
+    return members.map((member) => ({
+      userId: String(member.userId),
+
+      name:
+        String(member.userId) === currentUserId
+          ? currentUserName
+          : member.name || "Project member",
+    }));
+  };
+
+  const canDeleteTask = (task) => {
+    if (!task.projectId) {
+      return task.createdById === currentUserId;
+    }
+
+    const role = getProjectRole(task.projectId);
+
+    return role === "owner" || role === "admin";
+  };
+
+  const canUpdateTask = (task) => {
+    if (!task.projectId) {
+      return task.createdById === currentUserId;
+    }
+
+    const role = getProjectRole(task.projectId);
+
+    return (
+      role === "owner" ||
+      role === "admin" ||
+      (
+        role === "member" &&
+        task.assignedToId === currentUserId
+      )
+    );
+  };
+
+  // ========================================
+  // TASK COUNTS
+  // ========================================
 
   const counts = useMemo(() => {
     return {
       all: tasks.length,
-      todo: tasks.filter((task) => getStatus(task) === "To do").length,
+
+      todo: tasks.filter(
+        (task) => getStatus(task) === "To do"
+      ).length,
+
       progress: tasks.filter(
         (task) => getStatus(task) === "In progress"
       ).length,
+
       completed: tasks.filter(
         (task) => getStatus(task) === "Completed"
       ).length,
+
       overdue: tasks.filter(
         (task) => getStatus(task) === "Overdue"
       ).length,
     };
   }, [tasks]);
+
+  // ========================================
+  // SEARCH AND FILTER
+  // ========================================
 
   const filteredTasks = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -149,63 +423,243 @@ function TaskPage() {
       const status = getStatus(task);
 
       const matchesFilter =
-        activeFilter === "All tasks" || status === activeFilter;
+        activeFilter === "All tasks" ||
+        status === activeFilter;
 
       const matchesSearch =
         !query ||
         task.title.toLowerCase().includes(query) ||
-        task.project.toLowerCase().includes(query) ||
-        task.assignee.toLowerCase().includes(query);
+        (task.project || "Personal")
+          .toLowerCase()
+          .includes(query) ||
+        task.assignedTo.toLowerCase().includes(query);
 
       return matchesFilter && matchesSearch;
     });
   }, [tasks, activeFilter, search]);
+
+  // ========================================
+  // RESET FORM
+  // ========================================
 
   const resetForm = () => {
     setForm({
       title: "",
       description: "",
       project: "",
-      assignee: "You",
+      assignedTo: currentUserId,
       priority: "Medium",
-      status: "To do",
       dueDate: "",
     });
+
     setFormError("");
   };
 
-  const handleCreateTask = (event) => {
+  // ========================================
+  // CREATE NEW TASK
+  // ========================================
+
+  const handleCreateTask = async (event) => {
     event.preventDefault();
 
     const title = form.title.trim();
 
     if (!title) {
-      setFormError("Enter a task title.");
+      setFormError("Please enter a task title.");
       return;
     }
 
-    const newTask = {
-      ...form,
-      title,
-      description: form.description.trim(),
-      project: form.project.trim() || "General",
-      id: Date.now(),
-    };
+    if (!canCreateTaskInProject(form.project)) {
+      setFormError(
+        "Only project owners and admins can create project tasks."
+      );
+      return;
+    }
 
-    setTasks((current) => [newTask, ...current]);
-    setActiveFilter("All tasks");
-    setSearch("");
-    setIsCreateOpen(false);
-    resetForm();
+    const availableAssignees =
+      getAvailableAssignees(form.project);
+
+    const validAssignee = availableAssignees.some(
+      (member) => member.userId === form.assignedTo
+    );
+
+    if (form.project && !validAssignee) {
+      setFormError(
+        "Please select a valid project member."
+      );
+      return;
+    }
+
+    setIsSubmitting(true);
+    setFormError("");
+
+    try {
+      const response = await fetch("/api/tasks", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          title,
+          description: form.description.trim(),
+          projectId: form.project || null,
+          assignedTo: form.project
+            ? form.assignedTo
+            : currentUserId,
+          priority: form.priority,
+          dueDate: form.dueDate || null,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.message || "Unable to create task."
+        );
+      }
+
+      await loadPageData();
+
+      setActiveFilter("All tasks");
+      setSearch("");
+      setIsCreateOpen(false);
+
+      resetForm();
+    } catch (error) {
+      setFormError(
+        error.message || "Unable to create task."
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const updateStatus = (taskId, nextStatus) => {
+  // ========================================
+  // UPDATE TASK STATUS
+  // ========================================
+
+  const updateStatus = async (taskId, nextStatus) => {
+    const task = tasks.find(
+      (item) => item.id === taskId
+    );
+
+    if (!task || !canUpdateTask(task)) return;
+
+    const previousStatus = task.status;
+
     setTasks((current) =>
-      current.map((task) =>
-        task.id === taskId ? { ...task, status: nextStatus } : task
+      current.map((item) =>
+        item.id === taskId
+          ? { ...item, status: nextStatus }
+          : item
       )
     );
+
+    setSelectedTask((current) =>
+      current?.id === taskId
+        ? { ...current, status: nextStatus }
+        : current
+    );
+
+    try {
+      const response = await fetch(
+        `/api/tasks/${taskId}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            status: nextStatus,
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.message || "Unable to update task."
+        );
+      }
+    } catch (error) {
+      console.error("Task status update error:", error);
+
+      setTasks((current) =>
+        current.map((item) =>
+          item.id === taskId
+            ? { ...item, status: previousStatus }
+            : item
+        )
+      );
+
+      setSelectedTask((current) =>
+        current?.id === taskId
+          ? { ...current, status: previousStatus }
+          : current
+      );
+
+      setPageError(
+        error.message || "Unable to update task."
+      );
+    }
   };
+
+  // ========================================
+  // DELETE TASK
+  // ========================================
+
+  const handleDeleteTask = async () => {
+    if (
+      !taskToDelete ||
+      !canDeleteTask(taskToDelete)
+    ) {
+      setTaskToDelete(null);
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `/api/tasks/${taskToDelete.id}`,
+        {
+          method: "DELETE",
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.message || "Unable to delete task."
+        );
+      }
+
+      setTasks((current) =>
+        current.filter(
+          (task) => task.id !== taskToDelete.id
+        )
+      );
+
+      if (selectedTask?.id === taskToDelete.id) {
+        setSelectedTask(null);
+      }
+
+      setTaskToDelete(null);
+    } catch (error) {
+      console.error("Task deletion error:", error);
+
+      setPageError(
+        error.message || "Unable to delete task."
+      );
+
+      setTaskToDelete(null);
+    }
+  };
+
+  // ========================================
+  // OPEN CREATE MODAL
+  // ========================================
 
   const openCreate = () => {
     setSelectedTask(null);
@@ -213,26 +667,58 @@ function TaskPage() {
     setIsCreateOpen(true);
   };
 
+  // ========================================
+  // HANDLE PROJECT CHANGE
+  // ========================================
+
+  const handleProjectChange = (nextProject) => {
+    const availableMembers =
+      getAvailableAssignees(nextProject);
+
+    const nextAssignee = availableMembers.some(
+      (member) => member.userId === form.assignedTo
+    )
+      ? form.assignedTo
+      : availableMembers[0]?.userId || currentUserId;
+
+    setForm((current) => ({
+      ...current,
+      project: nextProject,
+      assignedTo: nextAssignee,
+    }));
+  };
+
+  // ========================================
+  // PAGE UI
+  // ========================================
+
   return (
     <main className="flex h-dvh w-full overflow-hidden bg-slate-100">
       <Sidebar active="tasks" />
       <Sidebarmob active="tasks" />
 
       <div className="ml-[76px] flex h-dvh min-w-0 flex-1 flex-col overflow-hidden lg:ml-0">
-        {/* Header */}
+
+        {/* HEADER */}
+
         <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/95 backdrop-blur-xl">
           <div className="flex min-h-[76px] items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
+
             <div className="hidden items-center gap-2 text-sm text-slate-400 lg:flex">
               Workspace
               <span>/</span>
-              <span className="font-semibold text-slate-800">My tasks</span>
+              <span className="font-semibold text-slate-800">
+                My tasks
+              </span>
             </div>
 
             <div className="min-w-0 flex-1 lg:max-w-md">
               <input
                 type="search"
                 value={search}
-                onChange={(event) => setSearch(event.target.value)}
+                onChange={(event) =>
+                  setSearch(event.target.value)
+                }
                 placeholder="Search your tasks..."
                 aria-label="Search tasks"
                 className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-base text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-500/10 sm:text-sm"
@@ -247,17 +733,22 @@ function TaskPage() {
               <span className="text-lg leading-none">+</span>
               Create task
             </button>
+
           </div>
         </header>
 
-        {/* Scrollable page */}
-        <div className="scrollbar-hide mx-auto flex w-full max-w-[1800px] min-h-0 flex-1 flex-col gap-6 overflow-y-auto overflow-x-hidden p-3 sm:gap-7 sm:p-6 lg:gap-8 lg:p-8">
-          {/* Page title */}
+        {/* SCROLLABLE CONTENT */}
+
+        <div className="scrollbar-hide mx-auto flex min-h-0 w-full max-w-[1800px] flex-1 flex-col gap-6 overflow-y-auto overflow-x-hidden p-3 sm:gap-7 sm:p-6 lg:gap-8 lg:p-8">
+
+          {/* PAGE TITLE */}
+
           <section className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
             <div className="space-y-2">
               <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">
                 My tasks
               </h1>
+
               <p className="text-sm leading-6 text-slate-500 sm:text-base">
                 Create, organize, and track the work assigned to you.
               </p>
@@ -273,16 +764,57 @@ function TaskPage() {
             </button>
           </section>
 
-          {/* Summary */}
+          {pageError && (
+            <div
+              className="flex items-start justify-between gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700"
+              role="alert"
+            >
+              <span>{pageError}</span>
+
+              <button
+                type="button"
+                onClick={() => setPageError("")}
+                className="font-bold"
+                aria-label="Dismiss error"
+              >
+                ×
+              </button>
+            </div>
+          )}
+
+          {isLoading && (
+            <div className="rounded-2xl border border-slate-100 bg-white px-5 py-10 text-center text-sm font-medium text-slate-500">
+              Loading your tasks...
+            </div>
+          )}
+
+          {/* SUMMARY CARDS */}
+
           <section
             aria-label="Task summary"
             className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-5"
           >
             {[
-              { label: "Total tasks", value: counts.all, color: "text-slate-900" },
-              { label: "In progress", value: counts.progress, color: "text-blue-600" },
-              { label: "Completed", value: counts.completed, color: "text-emerald-600" },
-              { label: "Overdue", value: counts.overdue, color: "text-rose-600" },
+              {
+                label: "Total tasks",
+                value: counts.all,
+                color: "text-slate-900",
+              },
+              {
+                label: "In progress",
+                value: counts.progress,
+                color: "text-blue-600",
+              },
+              {
+                label: "Completed",
+                value: counts.completed,
+                color: "text-emerald-600",
+              },
+              {
+                label: "Overdue",
+                value: counts.overdue,
+                color: "text-rose-600",
+              },
             ].map((item) => (
               <div
                 key={item.label}
@@ -291,44 +823,53 @@ function TaskPage() {
                 <p className="text-xs font-semibold text-slate-500 sm:text-sm">
                   {item.label}
                 </p>
-                <p
-                  className={`mt-2 text-3xl font-extrabold tracking-tight ${item.color}`}
-                >
+
+                <p className={`mt-2 text-3xl font-extrabold tracking-tight ${item.color}`}>
                   {item.value}
                 </p>
               </div>
             ))}
           </section>
 
-          {/* Task list */}
+          {/* TASK LIST */}
+
           <section className="min-w-0 rounded-2xl border border-slate-100 bg-white shadow-sm">
+
             <div className="flex flex-col gap-4 border-b border-slate-100 p-4 sm:p-6">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <h2 className="text-lg font-bold text-slate-900 sm:text-xl">
                     All tasks
                   </h2>
+
                   <p className="mt-1 text-sm text-slate-500">
                     {filteredTasks.length}{" "}
-                    {filteredTasks.length === 1 ? "task" : "tasks"} found
+                    {filteredTasks.length === 1
+                      ? "task"
+                      : "tasks"}{" "}
+                    found
                   </p>
                 </div>
               </div>
 
-              {/* Filters */}
+              {/* FILTERS */}
+
               <div
                 className="flex gap-2 overflow-x-auto pb-1"
                 role="group"
                 aria-label="Filter tasks by status"
               >
                 {filters.map((filter) => {
-                  const isActive = activeFilter === filter;
+                  const isActive =
+                    activeFilter === filter;
 
                   return (
                     <button
                       key={filter}
                       type="button"
-                      onClick={() => setActiveFilter(filter)}
+                      onClick={() =>
+                        setActiveFilter(filter)
+                      }
                       aria-pressed={isActive}
                       className={`min-h-10 shrink-0 rounded-xl px-4 text-xs font-semibold transition sm:text-sm ${
                         isActive
@@ -343,7 +884,8 @@ function TaskPage() {
               </div>
             </div>
 
-            {/* Table header - desktop */}
+            {/* DESKTOP TABLE HEADER */}
+
             <div className="hidden grid-cols-[minmax(0,1.7fr)_minmax(110px,1fr)_minmax(90px,0.8fr)_minmax(100px,0.9fr)_minmax(100px,0.9fr)] gap-4 bg-slate-50 px-6 py-3 text-xs font-bold uppercase tracking-wide text-slate-400 md:grid">
               <span>Task</span>
               <span>Project</span>
@@ -352,9 +894,11 @@ function TaskPage() {
               <span>Status</span>
             </div>
 
-            {/* Records */}
-           <div className="h-[480px] sm:h-[420px] divide-y divide-slate-100 overflow-y-auto scrollbar-hide border border-slate-200 rounded-b-2xl">
-              {filteredTasks.map((task) => {
+            {/* TASK RECORDS */}
+
+            <div className="h-[480px] divide-y divide-slate-100 overflow-y-auto rounded-b-2xl border border-slate-200 scrollbar-hide sm:h-[420px]">
+
+              {!isLoading && filteredTasks.map((task) => {
                 const status = getStatus(task);
 
                 return (
@@ -362,49 +906,64 @@ function TaskPage() {
                     key={task.id}
                     className="grid grid-cols-1 gap-3 p-4 transition-colors hover:bg-blue-50/30 sm:p-5 md:grid-cols-[minmax(0,1.7fr)_minmax(110px,1fr)_minmax(90px,0.8fr)_minmax(100px,0.9fr)_minmax(100px,0.9fr)] md:items-center md:gap-4 md:px-6"
                   >
+
+                    {/* TASK TITLE */}
+
                     <button
                       type="button"
                       onClick={() => setSelectedTask(task)}
-                      className="min-w-0 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 rounded-lg"
+                      className="min-w-0 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
                       aria-label={`View task: ${task.title}`}
                     >
                       <p className="truncate text-sm font-bold text-slate-800">
                         {task.title}
                       </p>
+
                       <p className="mt-1 line-clamp-1 text-xs text-slate-400">
                         {task.description || "No description"}
                       </p>
+
                       <p className="mt-2 text-xs text-slate-500 md:hidden">
-                        Assigned to {task.assignee}
+                        Assigned to {task.assignedTo}
                       </p>
                     </button>
+
+                    {/* PROJECT */}
 
                     <div className="flex min-w-0 items-center justify-between gap-3 md:block">
                       <span className="text-xs text-slate-400 md:hidden">
                         Project
                       </span>
+
                       <span className="truncate text-sm font-medium text-slate-600">
-                        {task.project}
+                        {task.project || "Personal"}
                       </span>
                     </div>
+
+                    {/* PRIORITY */}
 
                     <div className="flex items-center justify-between gap-3 md:block">
                       <span className="text-xs text-slate-400 md:hidden">
                         Priority
                       </span>
+
                       <span
                         className={`inline-flex rounded-lg px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${
-                          priorityStyles[task.priority]
+                          priorityStyles[task.priority] ||
+                          priorityStyles.Medium
                         }`}
                       >
                         {task.priority}
                       </span>
                     </div>
 
+                    {/* DUE DATE */}
+
                     <div className="flex items-center justify-between gap-3 md:block">
                       <span className="text-xs text-slate-400 md:hidden">
                         Due date
                       </span>
+
                       <span
                         className={`text-xs font-semibold sm:text-sm ${
                           status === "Overdue"
@@ -416,41 +975,76 @@ function TaskPage() {
                       </span>
                     </div>
 
+                    {/* STATUS */}
+
                     <div className="flex items-center justify-between gap-3 md:block">
                       <span className="text-xs text-slate-400 md:hidden">
                         Status
                       </span>
-                      <select
-                        value={task.status}
-                        onChange={(event) =>
-                          updateStatus(task.id, event.target.value)
-                        }
-                        aria-label={`Change status for ${task.title}`}
-                        className={`min-h-9 max-w-full rounded-lg border-0 px-2.5 py-1.5 text-xs font-semibold outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
-                          statusStyles[status]
-                        }`}
-                      >
-                        <option value="To do">To do</option>
-                        <option value="In progress">In progress</option>
-                        <option value="Completed">Completed</option>
-                      </select>
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        {canUpdateTask(task) ? (
+                          <select
+                            value={task.status}
+                            onChange={(event) =>
+                              updateStatus(
+                                task.id,
+                                event.target.value
+                              )
+                            }
+                            aria-label={`Change status for ${task.title}`}
+                            className={`min-h-9 max-w-full rounded-lg border-0 px-2.5 py-1.5 text-xs font-semibold outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
+                              statusStyles[status]
+                            }`}
+                          >
+                            <option value="To do">
+                              To do
+                            </option>
+                            <option value="In progress">
+                              In progress
+                            </option>
+                            <option value="Completed">
+                              Completed
+                            </option>
+                          </select>
+                        ) : (
+                          <span
+                            className={`rounded-lg px-3 py-2 text-xs font-semibold ${statusStyles[status]}`}
+                            title="Only the assignee can update this task"
+                          >
+                            {status}
+                          </span>
+                        )}
+
+                        {status === "Overdue" && (
+                          <span className="rounded-md bg-rose-50 px-2 py-1 text-[10px] font-bold text-rose-600">
+                            Overdue
+                          </span>
+                        )}
+                      </div>
                     </div>
+
                   </article>
                 );
               })}
 
-              {filteredTasks.length === 0 && (
+              {/* EMPTY STATE */}
+
+              {!isLoading && filteredTasks.length === 0 && (
                 <div className="flex flex-col items-center justify-center px-5 py-16 text-center">
                   <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
                     <span className="text-2xl">⌕</span>
                   </div>
+
                   <h3 className="mt-4 text-base font-bold text-slate-800">
                     No tasks found
                   </h3>
+
                   <p className="mt-1 max-w-sm text-sm text-slate-500">
                     No tasks match your search. Try another keyword or clear
                     the filters.
                   </p>
+
                   <button
                     type="button"
                     onClick={() => {
@@ -468,14 +1062,17 @@ function TaskPage() {
         </div>
       </div>
 
-      {/* Create task dialog */}
+      {/* ======================================
+          CREATE TASK MODAL
+      ====================================== */}
+
       {isCreateOpen && (
         <div
           className="fixed inset-0 z-[100] flex items-end justify-center bg-slate-950/50 p-0 backdrop-blur-sm sm:items-center sm:p-5"
           onMouseDown={(event) => {
             if (event.target === event.currentTarget) {
               setIsCreateOpen(false);
-              setFormError("");
+              resetForm();
             }
           }}
         >
@@ -485,6 +1082,9 @@ function TaskPage() {
             aria-labelledby="create-task-title"
             className="max-h-[92dvh] w-full max-w-2xl overflow-y-auto rounded-t-3xl bg-white shadow-2xl sm:rounded-3xl"
           >
+
+            {/* MODAL HEADER */}
+
             <div className="flex items-center justify-between border-b border-slate-100 px-5 py-5 sm:px-7">
               <div>
                 <h2
@@ -493,8 +1093,9 @@ function TaskPage() {
                 >
                   Create a task
                 </h2>
+
                 <p className="mt-1 text-sm text-slate-500">
-                  Add the details and organize your work.
+                  Add details and organize your work.
                 </p>
               </div>
 
@@ -502,7 +1103,7 @@ function TaskPage() {
                 type="button"
                 onClick={() => {
                   setIsCreateOpen(false);
-                  setFormError("");
+                  resetForm();
                 }}
                 aria-label="Close create task dialog"
                 className="flex h-11 w-11 items-center justify-center rounded-xl text-xl text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
@@ -511,7 +1112,15 @@ function TaskPage() {
               </button>
             </div>
 
-            <form onSubmit={handleCreateTask} className="space-y-5 p-5 sm:p-7">
+            {/* CREATE TASK FORM */}
+
+            <form
+              onSubmit={handleCreateTask}
+              className="space-y-5 p-5 sm:p-7"
+            >
+
+              {/* TITLE */}
+
               <div>
                 <label
                   htmlFor="task-title"
@@ -519,6 +1128,7 @@ function TaskPage() {
                 >
                   Task title <span className="text-rose-500">*</span>
                 </label>
+
                 <input
                   id="task-title"
                   type="text"
@@ -526,18 +1136,29 @@ function TaskPage() {
                   autoFocus
                   maxLength={120}
                   value={form.title}
-                  onChange={(event) =>
-                    setForm({ ...form, title: event.target.value })
-                  }
+                  onChange={(event) => {
+                    setForm({
+                      ...form,
+                      title: event.target.value,
+                    });
+
+                    setFormError("");
+                  }}
                   placeholder="e.g. Design the new dashboard"
                   className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 text-base text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-500/10 sm:text-sm"
                 />
+
                 {formError && (
-                  <p role="alert" className="mt-2 text-sm text-rose-600">
+                  <p
+                    role="alert"
+                    className="mt-2 text-sm text-rose-600"
+                  >
                     {formError}
                   </p>
                 )}
               </div>
+
+              {/* DESCRIPTION */}
 
               <div>
                 <label
@@ -546,20 +1167,29 @@ function TaskPage() {
                 >
                   Description
                 </label>
+
                 <textarea
                   id="task-description"
                   rows={3}
                   maxLength={1000}
                   value={form.description}
                   onChange={(event) =>
-                    setForm({ ...form, description: event.target.value })
+                    setForm({
+                      ...form,
+                      description: event.target.value,
+                    })
                   }
                   placeholder="Add details about this task..."
                   className="w-full resize-y rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-base text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-500/10 sm:text-sm"
                 />
               </div>
 
+              {/* PROJECT AND ASSIGNEE */}
+
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+
+                {/* PROJECT DROPDOWN */}
+
                 <div>
                   <label
                     htmlFor="task-project"
@@ -567,39 +1197,93 @@ function TaskPage() {
                   >
                     Project
                   </label>
-                  <input
+
+                  <select
                     id="task-project"
-                    type="text"
-                    maxLength={100}
                     value={form.project}
                     onChange={(event) =>
-                      setForm({ ...form, project: event.target.value })
+                      handleProjectChange(event.target.value)
                     }
-                    placeholder="Project name"
-                    className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 text-base text-slate-800 outline-none transition focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-500/10 sm:text-sm"
-                  />
+                    className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 text-base text-slate-700 outline-none transition focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-500/10 sm:text-sm"
+                  >
+                    <option value="">
+                      No Project (Personal)
+                    </option>
+
+                    {projects
+                      .filter((project) => !project.archived)
+                      .map((project) => {
+                        const role = getProjectRole(
+                          String(project._id)
+                        );
+
+                        const allowed = canCreateTaskInProject(
+                          String(project._id)
+                        );
+
+                        return (
+                          <option
+                            key={project._id}
+                            value={String(project._id)}
+                            disabled={!allowed}
+                          >
+                            {project.name} — {(role || "member").toUpperCase()}
+                            {!allowed
+                              ? " (Cannot create tasks)"
+                              : ""}
+                          </option>
+                        );
+                      })}
+                  </select>
+
+                  <p className="mt-1.5 text-xs text-slate-400">
+                    Select a project or keep this personal.
+                  </p>
                 </div>
+
+                {/* ASSIGNEE DROPDOWN */}
 
                 <div>
                   <label
                     htmlFor="task-assignee"
                     className="mb-2 block text-sm font-semibold text-slate-700"
                   >
-                    Assignee
+                    Assign to
                   </label>
+
                   <select
                     id="task-assignee"
-                    value={form.assignee}
+                    value={form.assignedTo}
                     onChange={(event) =>
-                      setForm({ ...form, assignee: event.target.value })
+                      setForm({
+                        ...form,
+                        assignedTo: event.target.value,
+                      })
                     }
-                    className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 text-base text-slate-700 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10 sm:text-sm"
+                    className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 text-base text-slate-700 outline-none transition focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-500/10 sm:text-sm"
                   >
-                    <option value="You">You</option>
-                    <option value="Riya">Riya</option>
-                    <option value="Alex">Alex</option>
+                    {getAvailableAssignees(form.project).map(
+                      (member) => (
+                        <option
+                          key={member.userId}
+                          value={member.userId}
+                        >
+                          {member.userId === currentUserId
+                            ? `${member.name} (Me)`
+                            : member.name}
+                        </option>
+                      )
+                    )}
                   </select>
+
+                  <p className="mt-1.5 text-xs text-slate-400">
+                    {form.project
+                      ? "Showing selected project members."
+                      : "Personal tasks are assigned to you."}
+                  </p>
                 </div>
+
+                {/* PRIORITY */}
 
                 <div>
                   <label
@@ -608,41 +1292,27 @@ function TaskPage() {
                   >
                     Priority
                   </label>
+
                   <select
                     id="task-priority"
                     value={form.priority}
                     onChange={(event) =>
-                      setForm({ ...form, priority: event.target.value })
+                      setForm({
+                        ...form,
+                        priority: event.target.value,
+                      })
                     }
-                    className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 text-base text-slate-700 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10 sm:text-sm"
+                    className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 text-base text-slate-700 outline-none transition focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-500/10 sm:text-sm"
                   >
                     <option value="Low">Low</option>
                     <option value="Medium">Medium</option>
                     <option value="High">High</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="task-status"
-                    className="mb-2 block text-sm font-semibold text-slate-700"
-                  >
-                    Status
-                  </label>
-                  <select
-                    id="task-status"
-                    value={form.status}
-                    onChange={(event) =>
-                      setForm({ ...form, status: event.target.value })
-                    }
-                    className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 text-base text-slate-700 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10 sm:text-sm"
-                  >
-                    <option value="To do">To do</option>
-                    <option value="In progress">In progress</option>
-                    <option value="Completed">Completed</option>
+                    <option value="Urgent">Urgent</option>
                   </select>
                 </div>
               </div>
+
+              {/* DUE DATE */}
 
               <div>
                 <label
@@ -650,17 +1320,48 @@ function TaskPage() {
                   className="mb-2 block text-sm font-semibold text-slate-700"
                 >
                   Due date
+                  <span className="ml-2 text-xs font-normal text-slate-400">
+                    (Optional)
+                  </span>
                 </label>
+
                 <input
                   id="task-due-date"
                   type="date"
                   value={form.dueDate}
                   onChange={(event) =>
-                    setForm({ ...form, dueDate: event.target.value })
+                    setForm({
+                      ...form,
+                      dueDate: event.target.value,
+                    })
                   }
-                  className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 text-base text-slate-700 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10 sm:text-sm"
+                  className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 text-base text-slate-700 outline-none transition focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-500/10 sm:text-sm"
                 />
+
+                <p className="mt-1.5 text-xs text-slate-400">
+                  Leave empty if this task has no deadline.
+                </p>
               </div>
+
+              {/* DEFAULT STATUS INFO */}
+
+              <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                <div>
+                  <p className="text-sm font-semibold text-slate-700">
+                    Initial status
+                  </p>
+
+                  <p className="mt-0.5 text-xs text-slate-400">
+                    New tasks always start as To do.
+                  </p>
+                </div>
+
+                <span className="rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 ring-1 ring-slate-200">
+                  To do
+                </span>
+              </div>
+
+              {/* FORM BUTTONS */}
 
               <div className="flex flex-col-reverse gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:justify-end">
                 <button
@@ -676,9 +1377,10 @@ function TaskPage() {
 
                 <button
                   type="submit"
-                  className="min-h-12 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-6 text-sm font-semibold text-white shadow-md shadow-blue-500/20 transition hover:shadow-lg active:scale-[0.98]"
+                  disabled={isSubmitting}
+                  className="min-h-12 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-6 text-sm font-semibold text-white shadow-md shadow-blue-500/20 transition hover:shadow-lg active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  Create task
+                  {isSubmitting ? "Creating..." : "Create task"}
                 </button>
               </div>
             </form>
@@ -686,27 +1388,46 @@ function TaskPage() {
         </div>
       )}
 
-      {/* Task details panel */}
+      {/* ======================================
+          TASK DETAILS MODAL
+      ====================================== */}
+
       {selectedTask && !isCreateOpen && (
-        <div className="fixed inset-0 z-[90] flex items-end justify-center bg-slate-950/40 p-0 backdrop-blur-sm sm:items-center sm:p-5">
+        <div
+          className="fixed inset-0 z-[90] flex items-end justify-center bg-slate-950/40 p-0 backdrop-blur-sm sm:items-center sm:p-5"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              setSelectedTask(null);
+            }
+          }}
+        >
           <section
             role="dialog"
             aria-modal="true"
             aria-labelledby="task-detail-title"
-            className="w-full max-w-lg rounded-t-3xl bg-white p-6 shadow-2xl sm:rounded-3xl"
+            className="max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-t-3xl bg-white p-6 shadow-2xl sm:rounded-3xl"
           >
+
+            {/* DETAILS HEADER */}
+
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-blue-600">
+                  Task details
+                </p>
+
                 <h2
                   id="task-detail-title"
-                  className="text-xl font-extrabold text-slate-900"
+                  className="break-words text-xl font-extrabold text-slate-900"
                 >
                   {selectedTask.title}
                 </h2>
+
                 <p className="mt-2 text-sm leading-6 text-slate-500">
                   {selectedTask.description || "No description added."}
                 </p>
               </div>
+
               <button
                 type="button"
                 aria-label="Close task details"
@@ -717,29 +1438,158 @@ function TaskPage() {
               </button>
             </div>
 
-            <div className="mt-6 grid grid-cols-2 gap-4">
+            {/* TASK INFORMATION */}
+
+            <div className="mt-6 grid grid-cols-2 gap-3">
               {[
-                ["Project", selectedTask.project],
-                ["Assignee", selectedTask.assignee],
+                ["Project", selectedTask.project || "Personal"],
+                ["Assigned to", selectedTask.assignedTo],
                 ["Priority", selectedTask.priority],
                 ["Due date", formatDate(selectedTask.dueDate)],
+                ["Created at", formatDate(selectedTask.createdAt)],
+                ["Created by", selectedTask.createdBy],
               ].map(([label, value]) => (
-                <div key={label} className="rounded-xl bg-slate-50 p-3">
-                  <p className="text-xs font-semibold text-slate-400">{label}</p>
-                  <p className="mt-1 truncate text-sm font-semibold text-slate-800">
+                <div
+                  key={label}
+                  className="min-w-0 rounded-xl bg-slate-50 p-3"
+                >
+                  <p className="text-xs font-semibold text-slate-400">
+                    {label}
+                  </p>
+
+                  <p className="mt-1 break-words text-sm font-semibold text-slate-800">
                     {value}
                   </p>
                 </div>
               ))}
             </div>
 
+            {/* STATUS */}
+
+            <div className="mt-4 rounded-xl border border-slate-200 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-slate-700">
+                    Task status
+                  </p>
+
+                  <p className="mt-1 text-xs text-slate-400">
+                    Update the task progress.
+                  </p>
+                </div>
+
+                {canUpdateTask(selectedTask) ? (
+                  <select
+                    value={selectedTask.status}
+                    onChange={(event) => {
+                      const nextStatus = event.target.value;
+
+                      updateStatus(
+                        selectedTask.id,
+                        nextStatus
+                      );
+                    }}
+                    className={`max-w-[150px] rounded-lg border-0 px-3 py-2 text-xs font-semibold outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
+                      statusStyles[getStatus(selectedTask)]
+                    }`}
+                  >
+                    <option value="To do">To do</option>
+                    <option value="In progress">In progress</option>
+                    <option value="Completed">Completed</option>
+                  </select>
+                ) : (
+                  <span
+                    className={`rounded-lg px-3 py-2 text-xs font-semibold ${statusStyles[getStatus(selectedTask)]}`}
+                  >
+                    {getStatus(selectedTask)}
+                  </span>
+                )}
+              </div>
+
+              {isOverdue(selectedTask) && (
+                <p className="mt-3 text-xs font-semibold text-rose-600">
+                  This task is overdue. Its deadline has passed.
+                </p>
+              )}
+            </div>
+
+            {/* DELETE BUTTON */}
+
+            {canDeleteTask(selectedTask) && (
+              <button
+                type="button"
+                onClick={() =>
+                  setTaskToDelete(selectedTask)
+                }
+                className="mt-5 flex min-h-11 w-full items-center justify-center rounded-xl border border-rose-200 bg-rose-50 px-4 text-sm font-semibold text-rose-600 transition hover:bg-rose-100"
+              >
+                Delete task
+              </button>
+            )}
+
             <button
               type="button"
               onClick={() => setSelectedTask(null)}
-              className="mt-6 min-h-12 w-full rounded-xl bg-blue-600 text-sm font-semibold text-white hover:bg-blue-700"
+              className="mt-3 min-h-12 w-full rounded-xl bg-blue-600 text-sm font-semibold text-white transition hover:bg-blue-700"
             >
               Done
             </button>
+          </section>
+        </div>
+      )}
+
+      {/* ======================================
+          DELETE CONFIRMATION MODAL
+      ====================================== */}
+
+      {taskToDelete && (
+        <div
+          className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              setTaskToDelete(null);
+            }
+          }}
+        >
+          <section
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="delete-task-title"
+            className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl"
+          >
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-rose-50 text-rose-600">
+              <span className="text-2xl font-bold">!</span>
+            </div>
+
+            <h2
+              id="delete-task-title"
+              className="mt-4 text-lg font-bold text-slate-900"
+            >
+              Delete this task?
+            </h2>
+
+            <p className="mt-2 break-words text-sm leading-6 text-slate-500">
+              Are you sure you want to delete "{taskToDelete.title}"? This
+              action cannot be undone.
+            </p>
+
+            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setTaskToDelete(null)}
+                className="min-h-11 rounded-xl border border-slate-200 px-5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={handleDeleteTask}
+                className="min-h-11 rounded-xl bg-rose-600 px-5 text-sm font-semibold text-white transition hover:bg-rose-700"
+              >
+                Yes, delete task
+              </button>
+            </div>
           </section>
         </div>
       )}
@@ -747,4 +1597,3 @@ function TaskPage() {
   );
 }
 
-export default TaskPage;
