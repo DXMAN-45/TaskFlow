@@ -56,3 +56,24 @@ projects
     admin : Riya Sharma admin this person can do everthing but can't delete the project 
     deadline: "2026-11-28", deadsline of the proct 
     createdAt: "2026-09-12", dsat of creation 
+
+teams data 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

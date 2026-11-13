@@ -11,10 +11,12 @@ import Sidebarmob from "../component/Sidebarmob";
 
 const filters = [
   "All tasks",
+  "Personal",
   "To do",
   "In progress",
   "Completed",
   "Overdue",
+
 ];
 
 const priorityStyles = {
@@ -114,6 +116,10 @@ export default function TaskPage() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState(null);
   const [taskToDelete, setTaskToDelete] = useState(null);
+
+  const [moveProjectId, setMoveProjectId] = useState("");
+  const [isMovingTask, setIsMovingTask] = useState(false);
+  const [moveError, setMoveError] = useState("");
 
   const [formError, setFormError] = useState("");
 
@@ -317,11 +323,11 @@ export default function TaskPage() {
     if (!projectId) {
       return currentUserId
         ? [
-            {
-              userId: currentUserId,
-              name: currentUserName,
-            },
-          ]
+          {
+            userId: currentUserId,
+            name: currentUserName,
+          },
+        ]
         : [];
     }
 
@@ -423,8 +429,10 @@ export default function TaskPage() {
       const status = getStatus(task);
 
       const matchesFilter =
-        activeFilter === "All tasks" ||
-        status === activeFilter;
+        activeFilter === "Personal"
+          ? task.projectId === null
+          : activeFilter === "All tasks" ||
+          status === activeFilter;
 
       const matchesSearch =
         !query ||
@@ -605,7 +613,146 @@ export default function TaskPage() {
       );
     }
   };
+  // ========================================
+  // MOVE PERSONAL TASK TO PROJECT
+  // ========================================
 
+  const handleMoveTaskToProject = async () => {
+if (!selectedTask || selectedTask.projectId || !moveProjectId || isMovingTask) {
+  return;
+}
+    
+
+    const selectedProject = projects.find(
+      (project) => String(project._id) === moveProjectId
+    );
+
+    if (
+      !selectedProject ||
+      selectedProject.archived ||
+      !canCreateTaskInProject(moveProjectId)
+    ) {
+      setMoveError(
+        "You must be a project owner or admin to move this task."
+      );
+      return;
+    }
+
+    setIsMovingTask(true);
+    setMoveError("");
+
+    try {
+      const response = await fetch(
+        `/api/tasks/${selectedTask.id}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            projectId: moveProjectId,
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.message || "Unable to move task."
+        );
+      }
+
+      const updatedTask = {
+        ...selectedTask,
+        projectId: moveProjectId,
+        project: selectedProject.name,
+        assignedToId: currentUserId,
+        assignedTo: currentUserName,
+      };
+
+      setTasks((current) =>
+        current.map((task) =>
+          task.id === selectedTask.id
+            ? updatedTask
+            : task
+        )
+      );
+
+      setSelectedTask(updatedTask);
+      setMoveProjectId("");
+    } catch (error) {
+      setMoveError(
+        error.message || "Unable to move task."
+      );
+    } finally {
+      setIsMovingTask(false);
+    }
+  };
+
+
+  // MOVE PROJECT TASK TO PERSONAL
+  const handleMoveTaskToPersonal = async () => {
+    if (!selectedTask?.projectId || isMovingTask) return;
+
+    const role = getProjectRole(selectedTask.projectId);
+
+    if (role !== "owner" && role !== "admin") {
+      setMoveError(
+        "Only project owners and admins can move tasks to Personal."
+      );
+      return;
+    }
+
+    setIsMovingTask(true);
+    setMoveError("");
+
+    try {
+      const response = await fetch(
+        `/api/tasks/${selectedTask.id}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            projectId: null,
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.message || "Unable to move task to Personal."
+        );
+      }
+
+      const updatedTask = {
+        ...selectedTask,
+        projectId: null,
+        project: null,
+        assignedToId: currentUserId,
+        assignedTo: currentUserName,
+      };
+
+      setTasks((current) =>
+        current.map((task) =>
+          task.id === selectedTask.id ? updatedTask : task
+        )
+      );
+
+      setSelectedTask(updatedTask);
+      setMoveProjectId("");
+    } catch (error) {
+      setMoveError(
+        error.message || "Unable to move task."
+      );
+    } finally {
+      setIsMovingTask(false);
+    }
+  };
   // ========================================
   // DELETE TASK
   // ========================================
@@ -839,7 +986,11 @@ export default function TaskPage() {
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <h2 className="text-lg font-bold text-slate-900 sm:text-xl">
-                    All tasks
+                    {activeFilter === "Personal"
+                      ? "Personal tasks"
+                      : activeFilter === "All tasks"
+                        ? "All tasks"
+                        : `${activeFilter} tasks`}
                   </h2>
 
                   <p className="mt-1 text-sm text-slate-500">
@@ -871,11 +1022,10 @@ export default function TaskPage() {
                         setActiveFilter(filter)
                       }
                       aria-pressed={isActive}
-                      className={`min-h-10 shrink-0 rounded-xl px-4 text-xs font-semibold transition sm:text-sm ${
-                        isActive
-                          ? "bg-blue-600 text-white shadow-sm shadow-blue-500/20"
-                          : "bg-slate-50 text-slate-500 hover:bg-blue-50 hover:text-blue-600"
-                      }`}
+                      className={`min-h-10 shrink-0 rounded-xl px-4 text-xs font-semibold transition sm:text-sm ${isActive
+                        ? "bg-blue-600 text-white shadow-sm shadow-blue-500/20"
+                        : "bg-slate-50 text-slate-500 hover:bg-blue-50 hover:text-blue-600"
+                        }`}
                     >
                       {filter}
                     </button>
@@ -911,7 +1061,11 @@ export default function TaskPage() {
 
                     <button
                       type="button"
-                      onClick={() => setSelectedTask(task)}
+                      onClick={() => {
+                        setSelectedTask(task);
+                        setMoveProjectId("");
+                        setMoveError("");
+                      }}
                       className="min-w-0 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
                       aria-label={`View task: ${task.title}`}
                     >
@@ -948,10 +1102,9 @@ export default function TaskPage() {
                       </span>
 
                       <span
-                        className={`inline-flex rounded-lg px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${
-                          priorityStyles[task.priority] ||
+                        className={`inline-flex rounded-lg px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${priorityStyles[task.priority] ||
                           priorityStyles.Medium
-                        }`}
+                          }`}
                       >
                         {task.priority}
                       </span>
@@ -965,15 +1118,15 @@ export default function TaskPage() {
                       </span>
 
                       <span
-                        className={`text-xs font-semibold sm:text-sm ${
-                          status === "Overdue"
-                            ? "text-rose-600"
-                            : "text-slate-500"
-                        }`}
+                        className={`text-xs font-semibold sm:text-sm ${status === "Overdue"
+                          ? "text-rose-600"
+                          : "text-slate-500"
+                          }`}
                       >
                         {formatDate(task.dueDate)}
                       </span>
                     </div>
+
 
                     {/* STATUS */}
 
@@ -993,9 +1146,8 @@ export default function TaskPage() {
                               )
                             }
                             aria-label={`Change status for ${task.title}`}
-                            className={`min-h-9 max-w-full rounded-lg border-0 px-2.5 py-1.5 text-xs font-semibold outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
-                              statusStyles[status]
-                            }`}
+                            className={`min-h-9 max-w-full rounded-lg border-0 px-2.5 py-1.5 text-xs font-semibold outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${statusStyles[status]
+                              }`}
                           >
                             <option value="To do">
                               To do
@@ -1463,7 +1615,110 @@ export default function TaskPage() {
                 </div>
               ))}
             </div>
+            {/* MOVE PERSONAL TASK TO PROJECT */}
 
+            {selectedTask && !selectedTask.projectId && (
+              <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50/50 p-4">
+                <div className="mb-3">
+                  <h3 className="text-sm font-bold text-slate-800">
+                    Move to project
+                  </h3>
+
+                  <p className="mt-1 text-xs leading-5 text-slate-500">
+                    Move this personal task into one of your projects.
+                  </p>
+                </div>
+
+                {projects.filter(
+                  (project) =>
+                    !project.archived &&
+                    canCreateTaskInProject(String(project._id))
+                ).length > 0 ? (
+                  <>
+                    <select
+                      value={moveProjectId}
+                      onChange={(event) => {
+                        setMoveProjectId(event.target.value);
+                        setMoveError("");
+                      }}
+                      className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10"
+                    >
+                      <option value="">Select a project</option>
+
+                      {projects
+                        .filter(
+                          (project) =>
+                            !project.archived &&
+                            canCreateTaskInProject(String(project._id))
+                        )
+                        .map((project) => (
+                          <option
+                            key={project._id}
+                            value={String(project._id)}
+                          >
+                            {project.name}
+                          </option>
+                        ))}
+                    </select>
+
+                    {moveError && (
+                      <p className="mt-2 text-xs font-medium text-rose-600">
+                        {moveError}
+                      </p>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={handleMoveTaskToProject}
+                      disabled={!moveProjectId || isMovingTask}
+                      className="mt-3 flex min-h-11 w-full items-center justify-center rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {isMovingTask ? "Moving task..." : "Move to project"}
+                    </button>
+                  </>
+                ) : (
+                  <p className="text-xs text-slate-500">
+                    You don't have any projects where you can create tasks.
+                  </p>
+                )}
+              </div>
+            )}
+            {/* MOVE PROJECT TASK TO PERSONAL */}
+
+            {selectedTask.projectId && (
+              <div className="mt-4 rounded-xl border border-amber-100 bg-amber-50/50 p-4">
+                <h3 className="text-sm font-bold text-slate-800">
+                  Move to Personal
+                </h3>
+
+                <p className="mt-1 text-xs leading-5 text-slate-500">
+                  Remove this task from its project and keep it in your personal tasks.
+                </p>
+
+                {canCreateTaskInProject(selectedTask.projectId) ? (
+                  <>
+                    {moveError && (
+                      <p className="mt-2 text-xs font-medium text-rose-600">
+                        {moveError}
+                      </p>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={handleMoveTaskToPersonal}
+                      disabled={isMovingTask}
+                      className="mt-3 flex min-h-11 w-full items-center justify-center rounded-xl bg-amber-600 px-4 text-sm font-semibold text-white transition hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {isMovingTask ? "Moving task..." : "Move to Personal"}
+                    </button>
+                  </>
+                ) : (
+                  <p className="mt-3 text-xs text-slate-500">
+                    Only project owners and admins can move tasks to Personal.
+                  </p>
+                )}
+              </div>
+            )}
             {/* STATUS */}
 
             <div className="mt-4 rounded-xl border border-slate-200 p-4">
@@ -1489,9 +1744,8 @@ export default function TaskPage() {
                         nextStatus
                       );
                     }}
-                    className={`max-w-[150px] rounded-lg border-0 px-3 py-2 text-xs font-semibold outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
-                      statusStyles[getStatus(selectedTask)]
-                    }`}
+                    className={`max-w-[150px] rounded-lg border-0 px-3 py-2 text-xs font-semibold outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${statusStyles[getStatus(selectedTask)]
+                      }`}
                   >
                     <option value="To do">To do</option>
                     <option value="In progress">In progress</option>

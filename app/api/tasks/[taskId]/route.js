@@ -4,6 +4,7 @@ import { ObjectId } from "mongodb";
 
 import clientPromise from "../../../../lib/mongodb";
 import { getCurrentUser } from "../../../../lib/auth";
+
 import {
   isValidObjectId,
   getProjectRole,
@@ -26,8 +27,10 @@ const editableFields = [
   "status",
   "dueDate",
   "assignedTo",
+  "projectId",
 ];
 
+// Validate incoming task updates.
 function validateUpdates(body) {
   if (!body || typeof body !== "object" || Array.isArray(body)) {
     return "Invalid request body.";
@@ -109,9 +112,24 @@ function validateUpdates(body) {
     return "Invalid assignee ID.";
   }
 
+  // Allow a valid project ID or null (Personal).
+  if (
+    "projectId" in body &&
+    body.projectId !== null &&
+    !isValidObjectId(body.projectId)
+  ) {
+    return "Invalid project ID.";
+  }
+
+  // Moving a task also determines its assignee.
+  if ("projectId" in body && "assignedTo" in body) {
+    return "You cannot change the project and assignee in the same request.";
+  }
+
   return null;
 }
 
+// Get task, user, and project permission context.
 async function getTaskContext(params) {
   const user = await getCurrentUser();
 
@@ -162,7 +180,7 @@ async function getTaskContext(params) {
       };
     }
 
-    return { db, task, user, role: null };
+    return { db, task, user, role: null, project: null };
   }
 
   // Project task: user must belong to its project.
@@ -188,7 +206,7 @@ async function getTaskContext(params) {
   return { db, task, user, role, project };
 }
 
-// GET: Fetch one task
+// GET: Fetch one task.
 export async function GET(request, { params }) {
   try {
     const context = await getTaskContext(params);
@@ -223,7 +241,7 @@ export async function GET(request, { params }) {
   }
 }
 
-// PATCH: Update a task
+// PATCH: Update or move a task.
 export async function PATCH(request, { params }) {
   try {
     const context = await getTaskContext(params);
@@ -245,6 +263,80 @@ export async function PATCH(request, { params }) {
 
     const isPersonalTask = !task.projectId;
 
+    // Handle Personal <-> Project movement.
+    if ("projectId" in body) {
+      // PERSONAL -> PROJECT
+      if (isPersonalTask) {
+        if (body.projectId === null) {
+          return NextResponse.json(
+            { message: "This task is already Personal." },
+            { status: 400 }
+          );
+        }
+
+        const destinationProject = await db
+          .collection("projects")
+          .findOne({
+            _id: new ObjectId(body.projectId),
+            archived: { $ne: true },
+            $or: [
+              { ownerId: new ObjectId(user.id) },
+              { "members.userId": new ObjectId(user.id) },
+            ],
+          });
+
+        if (!destinationProject) {
+          return NextResponse.json(
+            {
+              message:
+                "Project not found or you do not have access to it.",
+            },
+            { status: 404 }
+          );
+        }
+
+        const destinationRole = getProjectRole(
+          destinationProject,
+          user.id
+        );
+
+        if (
+          destinationRole !== "owner" &&
+          destinationRole !== "admin"
+        ) {
+          return NextResponse.json(
+            {
+              message:
+                "Only project owners and admins can move tasks into a project.",
+            },
+            { status: 403 }
+          );
+        }
+      } else {
+        // PROJECT -> PERSONAL
+        if (body.projectId !== null) {
+          return NextResponse.json(
+            {
+              message:
+                "Moving tasks between projects is not supported yet.",
+            },
+            { status: 400 }
+          );
+        }
+
+        if (role !== "owner" && role !== "admin") {
+          return NextResponse.json(
+            {
+              message:
+                "Only project owners and admins can move tasks to Personal.",
+            },
+            { status: 403 }
+          );
+        }
+      }
+    }
+
+    // Check permission to update the existing task.
     if (isPersonalTask) {
       if (task.createdBy?.toString() !== user.id) {
         return NextResponse.json(
@@ -284,7 +376,7 @@ export async function PATCH(request, { params }) {
       }
     }
 
-    // Personal tasks cannot be reassigned.
+    // Personal tasks cannot be reassigned directly.
     if (isPersonalTask && "assignedTo" in body) {
       return NextResponse.json(
         { message: "Personal tasks cannot be reassigned." },
@@ -301,8 +393,6 @@ export async function PATCH(request, { params }) {
         );
       }
 
-      const newAssigneeId = new ObjectId(body.assignedTo);
-
       const isMember =
         project.ownerId?.toString() === body.assignedTo ||
         project.members?.some(
@@ -312,12 +402,16 @@ export async function PATCH(request, { params }) {
 
       if (!isMember) {
         return NextResponse.json(
-          { message: "Assignee must be a member of this project." },
+          {
+            message:
+              "Assignee must be a member of this project.",
+          },
           { status: 400 }
         );
       }
     }
 
+    // Prepare database updates.
     const updates = {};
 
     for (const [key, value] of Object.entries(body)) {
@@ -325,11 +419,21 @@ export async function PATCH(request, { params }) {
         updates[key] = value.trim();
       } else if (key === "dueDate") {
         updates.dueDate = value || null;
+      } else if (key === "projectId") {
+        // null means Personal; otherwise convert to ObjectId.
+        updates.projectId = value
+          ? new ObjectId(value)
+          : null;
       } else if (key === "assignedTo") {
         updates.assignedTo = new ObjectId(value);
       } else {
         updates[key] = value;
       }
+    }
+
+    // When moving a task, the person moving it becomes its assignee.
+    if ("projectId" in body) {
+      updates.assignedTo = new ObjectId(user.id);
     }
 
     updates.updatedAt = new Date();
@@ -370,7 +474,7 @@ export async function PATCH(request, { params }) {
   }
 }
 
-// DELETE: Delete a task
+// DELETE: Delete a task.
 export async function DELETE(request, { params }) {
   try {
     const context = await getTaskContext(params);
