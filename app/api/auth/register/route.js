@@ -2,13 +2,17 @@
 import { NextResponse } from "next/server";
 import clientPromise from "@/lib/mongodb";
 import bcrypt from "bcryptjs";
+import {
+  ensureWorkspaceIndexes,
+  ensureDefaultWorkspace,
+} from "@/lib/workspace";
 
 export async function POST(request) {
   try {
     const body = await request.json();
     const { username, email, password } = body;
 
-    // Validate required fields
+    // Validate required fields.
     if (
       typeof username !== "string" ||
       typeof email !== "string" ||
@@ -30,11 +34,11 @@ export async function POST(request) {
       );
     }
 
-    // Normalize values
+    // Normalize values.
     const normalizedUsername = username.trim().toLowerCase();
     const normalizedEmail = email.trim().toLowerCase();
 
-    // Validate username
+    // Validate username.
     if (!/^[a-z0-9_]{3,20}$/.test(normalizedUsername)) {
       return NextResponse.json(
         {
@@ -45,7 +49,7 @@ export async function POST(request) {
       );
     }
 
-    // Validate email
+    // Validate email.
     if (
       normalizedEmail.length > 254 ||
       !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)
@@ -60,7 +64,7 @@ export async function POST(request) {
     const db = client.db("taskflow");
     const users = db.collection("users");
 
-    // Check for duplicate username or email
+    // Check for duplicate username or email.
     const existingUser = await users.findOne({
       $or: [
         { username: normalizedUsername },
@@ -82,10 +86,10 @@ export async function POST(request) {
       );
     }
 
-    // Hash password
+    // Hash password.
     const passwordHash = await bcrypt.hash(password, 12);
 
-    // Save user, including email
+    // Create user.
     const result = await users.insertOne({
       username: normalizedUsername,
       email: normalizedEmail,
@@ -93,6 +97,14 @@ export async function POST(request) {
       image: null,
       createdAt: new Date(),
     });
+
+    // Initialize the user's default workspace.
+    await ensureWorkspaceIndexes(db);
+
+    await ensureDefaultWorkspace(
+      db,
+      result.insertedId.toString()
+    );
 
     return NextResponse.json(
       {
