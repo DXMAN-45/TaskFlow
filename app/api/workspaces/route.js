@@ -108,6 +108,7 @@ export async function POST(request) {
     const db = client.db("taskflow");
 
     await ensureWorkspaceIndexes(db);
+    await ensureDefaultWorkspace(db, currentUser.id);
 
     // Find the authenticated user in MongoDB.
     const user = await db.collection("users").findOne({

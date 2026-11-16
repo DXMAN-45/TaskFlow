@@ -1,3 +1,6 @@
+{ Continue TaskFlow from this progress checkpoint. Follow the existing plan and don't repeat completed work.   }
+
+
 tasks
 
 title - name of the task
