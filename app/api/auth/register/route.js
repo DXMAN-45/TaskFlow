@@ -89,13 +89,20 @@ export async function POST(request) {
     // Hash password.
     const passwordHash = await bcrypt.hash(password, 12);
 
-    // Create user.
+    const now = new Date();
+
+    // Create user with a Free subscription.
     const result = await users.insertOne({
       username: normalizedUsername,
       email: normalizedEmail,
       passwordHash,
       image: null,
-      createdAt: new Date(),
+      subscription: {
+        plan: "free",
+        status: "active",
+        createdAt: now,
+      },
+      createdAt: now,
     });
 
     // Initialize the user's default workspace.
@@ -115,7 +122,9 @@ export async function POST(request) {
     );
   } catch (error) {
     if (error.code === 11000) {
-      const duplicateField = Object.keys(error.keyPattern || {})[0];
+      const duplicateField = Object.keys(
+        error.keyPattern || {}
+      )[0];
 
       return NextResponse.json(
         {

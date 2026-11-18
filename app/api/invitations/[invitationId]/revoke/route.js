@@ -28,7 +28,9 @@ export async function POST(request, { params }) {
       );
     }
 
-    const { workspaceId, invitationId } = await params;
+    const { invitationId } = await params;
+const { searchParams } = new URL(request.url);
+const workspaceId = searchParams.get("workspaceId");
 
     if (
       !ObjectId.isValid(workspaceId) ||

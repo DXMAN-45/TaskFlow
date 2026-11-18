@@ -10,6 +10,8 @@ import {
   ensureDefaultWorkspace,
   createWorkspace,
   getUserWorkspaces,
+  reserveOwnedWorkspaceSlot,
+  releaseOwnedWorkspaceSlot,
 } from "@/lib/workspace";
 
 // GET: Retrieve all workspaces belonging to the logged-in user.
@@ -36,16 +38,13 @@ export async function GET() {
 
     await ensureWorkspaceIndexes(db);
 
-    // Ensure the user has a default workspace.
     await ensureDefaultWorkspace(db, currentUser.id);
 
-    // Retrieve all accessible workspaces.
     const workspaces = await getUserWorkspaces(
       db,
       currentUser.id
     );
 
-    // Retrieve the user's active workspace.
     const user = await db.collection("users").findOne(
       { _id: new ObjectId(currentUser.id) },
       { projection: { activeWorkspaceId: 1 } }
@@ -117,7 +116,8 @@ export async function POST(request) {
     ) {
       return NextResponse.json(
         {
-          error: "Workspace name must be between 1 and 50 characters",
+          error:
+            "Workspace name must be between 1 and 50 characters",
         },
         { status: 400 }
       );
@@ -127,9 +127,10 @@ export async function POST(request) {
     const db = client.db("taskflow");
 
     await ensureWorkspaceIndexes(db);
+
+    // Make sure the default workspace exists first.
     await ensureDefaultWorkspace(db, currentUser.id);
 
-    // Find the authenticated user in MongoDB.
     const user = await db.collection("users").findOne({
       _id: new ObjectId(currentUser.id),
     });
@@ -141,13 +142,50 @@ export async function POST(request) {
       );
     }
 
-    // Create a non-default workspace.
-    const workspace = await createWorkspace({
+    // Reserve an ownership slot before creating the workspace.
+    const reservation = await reserveOwnedWorkspaceSlot(
       db,
-      user,
-      name: name.trim(),
-      isDefault: false,
-    });
+      currentUser.id
+    );
+
+    if (!reservation.allowed) {
+      return NextResponse.json(
+        {
+          error:
+            "You have reached your Free plan limit of 4 owned workspaces. Upgrade to Pro to create more.",
+          code: "WORKSPACE_LIMIT_REACHED",
+          plan: reservation.plan,
+          limit: reservation.limit,
+        },
+        { status: 403 }
+      );
+    }
+
+    let workspace;
+
+    try {
+      workspace = await createWorkspace({
+        db,
+        user,
+        name: name.trim(),
+        isDefault: false,
+      });
+    } catch (error) {
+      // Release the reserved slot if creation fails.
+      try {
+        await releaseOwnedWorkspaceSlot(
+          db,
+          currentUser.id
+        );
+      } catch (rollbackError) {
+        console.error(
+          "Workspace ownership rollback error:",
+          rollbackError
+        );
+      }
+
+      throw error;
+    }
 
     return NextResponse.json(
       {

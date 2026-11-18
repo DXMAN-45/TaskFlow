@@ -32,7 +32,8 @@ export async function POST(request, { params }) {
       );
     }
 
-    const { workspaceId } = await params;
+   const { searchParams } = new URL(request.url);
+const workspaceId = searchParams.get("workspaceId");
 
     if (!ObjectId.isValid(workspaceId)) {
       return NextResponse.json(
@@ -130,7 +131,8 @@ export async function GET(request, { params }) {
       );
     }
 
-    const { workspaceId } = await params;
+    const { searchParams } = new URL(request.url);
+const workspaceId = searchParams.get("workspaceId");
 
     if (!ObjectId.isValid(workspaceId)) {
       return NextResponse.json(

@@ -1,7 +1,8 @@
 
 "use client";
 import WorkspaceSwitcher from "../component/WorkspaceSwitcher";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import {
   Search,
   Plus,
@@ -227,7 +228,14 @@ export default function DashboardClient({ user = {} }) {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+const [receivedInvitations, setReceivedInvitations] = useState([]);
+const [invitationLoading, setInvitationLoading] = useState(true);
 
+const pendingInvitations = receivedInvitations.filter(
+  (invitation) => invitation.status === "pending"
+);
+
+const pendingInvitationCount = pendingInvitations.length;
   const [selectedTask, setSelectedTask] = useState(null);
 
   const [newTask, setNewTask] = useState({
@@ -403,7 +411,36 @@ export default function DashboardClient({ user = {} }) {
     setSelectedTask(task);
     setShowTaskModal(true);
   };
+useEffect(() => {
+  let isMounted = true;
 
+  const fetchInvitations = async () => {
+    try {
+      const response = await fetch("/api/invitations/received");
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to fetch invitations");
+      }
+
+      if (isMounted) {
+        setReceivedInvitations(data.invitations || []);
+      }
+    } catch (error) {
+      console.error("Dashboard invitations error:", error);
+    } finally {
+      if (isMounted) {
+        setInvitationLoading(false);
+      }
+    }
+  };
+
+  fetchInvitations();
+
+  return () => {
+    isMounted = false;
+  };
+}, []);
   return (
     <main className="flex h-dvh w-full overflow-hidden bg-[#f7f8fc] text-slate-800">
       {/* Desktop sidebar */}
@@ -467,7 +504,13 @@ export default function DashboardClient({ user = {} }) {
                 aria-label="Notifications"
               >
                 <Bell size={19} />
-                <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-red-500 ring-2 ring-white" />
+                {pendingInvitationCount > 0 && (
+  <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white ring-2 ring-white">
+    {pendingInvitationCount > 9 ? "9+" : pendingInvitationCount}
+  </span>
+)}
+
+              
               </button>
 
 
@@ -502,21 +545,49 @@ export default function DashboardClient({ user = {} }) {
                   </div>
 
                   <div className="space-y-3">
-                    <div className="flex gap-3 rounded-xl bg-indigo-50 p-3">
-                      <CheckCircle2
-                        size={18}
-                        className="mt-0.5 shrink-0 text-indigo-600"
-                      />
+                   {invitationLoading ? (
+  <p className="py-5 text-center text-sm text-slate-400">
+    Loading invitations...
+  </p>
+) : pendingInvitations.length === 0 ? (
+  <p className="py-5 text-center text-sm text-slate-400">
+    You have no pending invitations.
+  </p>
+) : (
+  pendingInvitations.slice(0, 3).map((invitation) => (
+    <div
+      key={invitation._id}
+      className="flex gap-3 rounded-xl bg-indigo-50 p-3"
+    >
+      <Users
+        size={19}
+        className="mt-0.5 shrink-0 text-indigo-600"
+      />
 
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold text-slate-800">
-                          Welcome to TaskFlow
-                        </p>
-                        <p className="mt-1 text-xs text-slate-500">
-                          Your workspace is ready.
-                        </p>
-                      </div>
-                    </div>
+      <div className="min-w-0">
+        <p className="text-sm font-semibold text-slate-800">
+          Workspace invitation
+        </p>
+
+        <p className="mt-1 text-xs text-slate-500">
+          {invitation.inviterUsername} invited you to join{" "}
+          <span className="font-semibold">
+            {invitation.workspaceName}
+          </span>
+          .
+        </p>
+      </div>
+    </div>
+  ))
+)}
+
+<Link
+  href="/invitations"
+  onClick={() => setShowNotifications(false)}
+  className="block rounded-xl bg-slate-900 px-4 py-3 text-center text-sm font-semibold text-white transition hover:bg-slate-700"
+>
+  View all invitations
+</Link>
 
                     <div className="flex gap-3 rounded-xl bg-slate-50 p-3">
                       <CalendarDays
