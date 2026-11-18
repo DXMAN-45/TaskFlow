@@ -8,6 +8,7 @@ import { getCurrentUser } from "@/lib/auth";
 // POST: Switch the user's active workspace.
 export async function POST(request) {
   try {
+    // 1. Authenticate user.
     const currentUser = await getCurrentUser();
 
     if (!currentUser) {
@@ -17,6 +18,7 @@ export async function POST(request) {
       );
     }
 
+    // 2. Validate user ID.
     if (!ObjectId.isValid(currentUser.id)) {
       return NextResponse.json(
         { error: "Invalid user ID" },
@@ -24,6 +26,7 @@ export async function POST(request) {
       );
     }
 
+    // 3. Parse request body.
     let body;
 
     try {
@@ -37,6 +40,7 @@ export async function POST(request) {
 
     const { workspaceId } = body || {};
 
+    // 4. Validate workspace ID.
     if (
       typeof workspaceId !== "string" ||
       !ObjectId.isValid(workspaceId)
@@ -47,29 +51,36 @@ export async function POST(request) {
       );
     }
 
+    // 5. Connect to MongoDB.
     const client = await clientPromise;
     const db = client.db("taskflow");
 
     const userObjectId = new ObjectId(currentUser.id);
     const workspaceObjectId = new ObjectId(workspaceId);
 
-    // Verify workspace membership.
-    const membership = await db.collection("workspaceMembers").findOne({
-      workspaceId: workspaceObjectId,
-      userId: userObjectId,
-    });
+    // 6. Verify workspace membership.
+    const membership = await db
+      .collection("workspaceMembers")
+      .findOne({
+        workspaceId: workspaceObjectId,
+        userId: userObjectId,
+      });
 
     if (!membership) {
       return NextResponse.json(
-        { error: "You do not have access to this workspace" },
+        {
+          error: "You do not have access to this workspace",
+        },
         { status: 403 }
       );
     }
 
-    // Confirm that the workspace exists.
-    const workspace = await db.collection("workspaces").findOne({
-      _id: workspaceObjectId,
-    });
+    // 7. Confirm that the workspace exists.
+    const workspace = await db
+      .collection("workspaces")
+      .findOne({
+        _id: workspaceObjectId,
+      });
 
     if (!workspace) {
       return NextResponse.json(
@@ -78,8 +89,8 @@ export async function POST(request) {
       );
     }
 
-    // Save the active workspace for this user.
-    await db.collection("users").updateOne(
+    // 8. Update the user's active workspace.
+    const result = await db.collection("users").updateOne(
       { _id: userObjectId },
       {
         $set: {
@@ -88,11 +99,24 @@ export async function POST(request) {
       }
     );
 
+    // 9. Confirm that the user document was updated.
+    if (result.matchedCount === 0) {
+      return NextResponse.json(
+        { error: "User not found" },
+        { status: 404 }
+      );
+    }
+
+    // 10. Return successful response.
     return NextResponse.json(
       {
         message: "Workspace switched successfully",
         workspace: {
-          ...workspace,
+          _id: workspace._id,
+          name: workspace.name,
+          ownerId: workspace.ownerId,
+          plan: workspace.plan,
+          isDefault: workspace.isDefault,
           role: membership.role,
         },
       },

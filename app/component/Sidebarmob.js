@@ -8,25 +8,31 @@ import { useRouter } from "next/navigation";
 
 const navigation = [
   {
-    label: "Overview",
+    name: "Overview",
     href: "/dashboard",
     key: "overview",
     icon: "/sidebar/overview.png",
   },
+   {
+    name: "Workspaces",
+    href: "/workspaces",
+    key: "workspaces",
+    icon: "/sidebar/workspaces.png",
+  },
   {
-    label: "My tasks",
+    name: "My tasks",
     href: "/tasks",
     key: "tasks",
     icon: "/sidebar/tasks.png",
   },
   {
-    label: "Team",
+    name: "Team",
     href: "/team",
     key: "team",
     icon: "/sidebar/teams.png",
   },
   {
-    label: "Projects",
+    name: "Projects",
     href: "/projects",
     key: "projects",
     icon: "/sidebar/projects.png",

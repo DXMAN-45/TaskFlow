@@ -6,6 +6,7 @@ import Sidebar from "../component/Sidebar";
 import Sidebarmob from "../component/Sidebarmob";
 import clientPromise from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
+import WorkspaceSettings from "../component/settings/WorkspaceSettings";
 
 export default async function SettingsPage() {
   const session = await getServerSession(authOptions);
@@ -123,7 +124,10 @@ export default async function SettingsPage() {
 
             </div>
           </section>
-
+{/* Workspace Management
+<div className="mt-6">
+  <WorkspaceSettings />
+</div> */}
           {/* Connected Accounts */}
           <section className="mt-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
 

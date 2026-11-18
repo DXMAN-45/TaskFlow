@@ -1,6 +1,6 @@
 
 "use client";
-
+import WorkspaceSwitcher from "../component/WorkspaceSwitcher";
 import { useMemo, useState } from "react";
 import {
   Search,
@@ -420,14 +420,23 @@ export default function DashboardClient({ user = {} }) {
       <section className="ml-[76px] flex min-w-0 flex-1 flex-col overflow-hidden lg:ml-0">
         {/* Header */}
         <header className="z-20 flex min-h-[76px] items-center justify-between border-b border-slate-200 bg-white px-4 sm:px-7 lg:px-9">
-          <div>
-            <p className="text-xs font-medium text-slate-400">
-              Workspace / Dashboard
-            </p>
-            <h1 className="mt-1 text-lg font-bold text-slate-900 sm:text-xl">
-              Overview
-            </h1>
-          </div>
+    
+<div className="min-w-0">
+  <div>
+    <p className="text-xs font-medium text-slate-400">
+      Workspace / Dashboard
+    </p>
+
+    <h1 className="mt-1 text-lg font-bold text-slate-900 sm:text-xl">
+      Overview
+    </h1>
+  </div>
+
+  <div className="mt-2 w-[min(170px,45vw)] sm:mt-0 sm:w-64">
+    <WorkspaceSwitcher />
+  </div>
+</div>
+
 
           <div className="flex items-center gap-3 sm:gap-5">
             {/* Search */}

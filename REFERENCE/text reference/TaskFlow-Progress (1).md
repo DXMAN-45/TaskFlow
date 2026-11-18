@@ -417,3 +417,155 @@ carefully ordered guarded writes with recovery strategy.
 -   The user makes all code changes. Give exact file paths and instructions; do not edit the repository or push code on the user's behalf.
 -   Do not claim any code was executed or any database state changed unless the user reports it or a tool verifies it.
 -   Continue one step at a time. Ask for build/test output before moving to the next implementation step.
+
+
+------------------------------------------------------------------------
+
+## 14. Latest progress update — 17 November 2026
+
+**This section supersedes the older "Exact point where we left off" and
+the older UI sequencing where they conflict.** The user and assistant
+have since completed more workspace backend work and started the frontend.
+
+### Current product/UI decision
+
+The user decided that workspace operations should live on a dedicated
+**Workspaces page**, not inside personal Account Settings.
+
+- Account Settings should remain focused on personal profile, security,
+  and connected sign-in accounts.
+- The dedicated Workspaces area should handle workspace listing,
+  switching, creation, members, invitations, workspace settings, and
+  deletion.
+- Keep the existing dashboard `WorkspaceSwitcher` for quick switching.
+  The dedicated page is for full workspace management.
+- Add a **Workspaces** item to the sidebar navigation when the page is
+  ready.
+
+### Database reset and current backend foundation
+
+The user later chose to delete/reset application data collections and
+build/test the frontend against the APIs. Preserve `users` and
+`visitor_logs`; do not delete them. Application data such as workspaces,
+workspace memberships, invitations, projects, project memberships, and
+tasks was reset by the user. Do not assume old test IDs or records still
+exist.
+
+The intended workflow is now:
+
+1. Build a frontend screen.
+2. Connect it to the existing API.
+3. Test actual UI interactions, loading, empty, error, and permission
+   states.
+4. Fix API issues revealed by the UI.
+5. Finish the feature before moving to the next one.
+
+Workspace foundation APIs and invitation/member APIs described in the
+earlier sections were implemented before the reset. The user has since
+confirmed workspace creation and switching work after restarting the
+development server. Treat older invitation IDs and workspace IDs as
+historical only.
+
+### Workspace switcher status
+
+- `app/component/WorkspaceSwitcher.js` was created by the user.
+- It loads workspaces from `GET /api/workspaces`.
+- It switches the active workspace using
+  `POST /api/workspaces/[workspaceId]/active`.
+- It can create a workspace using `POST /api/workspaces`.
+- The user reported workspace creation and switching are working.
+- A mobile visibility issue was fixed by moving the switcher out of a
+  `hidden sm:block` wrapper and placing it beneath the dashboard title
+  with a constrained mobile width.
+- The user confirmed the mobile layout is now fine and working.
+- Keep one shared switcher instance in the dashboard header; do not
+  duplicate desktop/mobile switcher instances.
+
+### Existing Account Settings page
+
+The user shared the current `app/setting/page.js`. It is a Server
+Component that:
+
+- Authenticates with `getServerSession(authOptions)` and redirects
+  unauthenticated users to `/login`.
+- Loads the user record from MongoDB.
+- Shows Profile Information (name, email, TaskFlow user ID).
+- Shows Security & Connected Accounts (Google and GitHub connection
+  status).
+- Uses `Sidebar` and `Sidebarmob`.
+
+A separate client component was created at
+`app/component/settings/WorkspaceSettings.js`. The user reported it
+compiled successfully, but then chose the dedicated Workspaces page
+approach instead. **Do not integrate this component into Account
+Settings.** It can remain unused for now or be removed later after
+checking references. Account Settings should stay personal-account
+focused.
+
+### Dedicated Workspaces page — current frontend step
+
+The user created the route file:
+
+`app/workspaces/page.js`
+
+The assistant provided an initial client-side listing page. Its current
+intended behavior/UI:
+
+- Fetches `GET /api/workspaces` on mount.
+- Displays total workspace count.
+- Displays the active workspace name.
+- Lists workspace cards with name, role, member count, and Default/Custom
+  label.
+- Highlights the active workspace.
+- Includes loading, error, empty, and refresh states.
+- Includes a Create Workspace button that is deliberately disabled in
+  this first UI-only step.
+- Uses `Sidebar` and `Sidebarmob`.
+- **Workspace switching from cards is not implemented yet.**
+- **Workspace creation from this page is not implemented yet.**
+- The user has pasted/saved this code, but has not yet reported whether
+  `/workspaces` compiles or whether the page has been tested in the
+  browser. Do not claim this page is working until the user confirms.
+
+### Immediate next action
+
+Ask the user to run/test the new page at `/workspaces` and share the
+result or screenshot. Confirm:
+
+1. The route compiles and loads.
+2. The workspace list and roles render correctly.
+3. The active workspace is correctly highlighted.
+4. The layout works on mobile.
+
+Only after this UI is confirmed should the next step be to implement
+switching directly from each workspace card using the existing active
+workspace API. Then implement workspace creation from this page.
+
+### Next frontend sequence
+
+1. Verify `/workspaces` listing UI.
+2. Add card-based workspace switching and refresh active state after a
+   successful switch.
+3. Add workspace creation with validation and loading/error states.
+4. Build `/workspaces/[workspaceId]` overview/details.
+5. Build Members management.
+6. Build Invitations management (sent and received).
+7. Build workspace settings (rename) and Danger Zone (delete), respecting
+   existing API permission and deletion restrictions.
+8. Add Workspaces to desktop and mobile sidebar navigation.
+9. Remove any unused WorkspaceSettings component only after checking
+   imports/references.
+
+### User workflow and preferences reaffirmed
+
+- User works in `/workspaces/TaskFlow` using GitHub Codespaces.
+- Use `main` only; no feature branches.
+- User makes code changes. Give exact file paths and code; do not modify
+  the repository or push code on the user's behalf.
+- Proceed one step at a time and wait for build/test output before
+  advancing.
+- Explain important reasoning without overwhelming the user.
+- Prefer relative imports.
+- Do not claim the `/workspaces` page compiles or works until confirmed.
+
+------------------------------------------------------------------------

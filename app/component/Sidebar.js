@@ -14,6 +14,12 @@ const navigation = [
     key: "overview",
     icon: "/sidebar/overview.png",
   },
+   {
+    name: "Workspaces",
+    href: "/workspaces",
+    key: "workspaces",
+    icon: "/sidebar/workspaces.png",
+  },
   {
     name: "My tasks",
     href: "/tasks",

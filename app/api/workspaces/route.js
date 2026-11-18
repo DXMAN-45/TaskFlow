@@ -45,8 +45,27 @@ export async function GET() {
       currentUser.id
     );
 
+    // Retrieve the user's active workspace.
+    const user = await db.collection("users").findOne(
+      { _id: new ObjectId(currentUser.id) },
+      { projection: { activeWorkspaceId: 1 } }
+    );
+
+    if (!user) {
+      return NextResponse.json(
+        { error: "User not found" },
+        { status: 404 }
+      );
+    }
+
+    const activeWorkspaceId =
+      user.activeWorkspaceId?.toString() || null;
+
     return NextResponse.json(
-      { workspaces },
+      {
+        activeWorkspaceId,
+        workspaces,
+      },
       { status: 200 }
     );
   } catch (error) {
