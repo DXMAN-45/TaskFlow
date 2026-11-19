@@ -166,8 +166,8 @@ export default function WorkspacesPage() {
 
   return (
     <div className="flex h-dvh overflow-hidden bg-slate-50">
-      <Sidebar />
-      <Sidebarmob />
+      <Sidebar active="workspaces" />
+      <Sidebarmob active="workspaces" />
 
       <main className="ml-[76px] min-w-0 flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-6 lg:ml-0 lg:p-8">
         <div className="mx-auto w-full max-w-6xl">
