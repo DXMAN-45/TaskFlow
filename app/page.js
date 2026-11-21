@@ -41,10 +41,7 @@ export default function Home() {
 
           <div className="space-y-5">
 
-            <span className="inline-flex w-fit items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-4 py-2 text-xs font-bold uppercase tracking-wider text-blue-600 sm:text-sm">
-            //   <span className="h-2 w-2 rounded-full bg-blue-500" />
-            //   Smarter Team Productivity
-            // </span>
+        
 
             <h1 className="text-4xl font-extrabold leading-[1.12] tracking-tight text-slate-900 sm:text-5xl lg:text-6xl xl:text-7xl">
               Work Smarter,
