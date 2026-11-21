@@ -1,7 +1,7 @@
-
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 
 export default function NotFound() {
@@ -34,7 +34,7 @@ export default function NotFound() {
 
           <Link
             href="/dashboard"
-            className="inline-flex min-h-11 items-center justify-center rounded-lg bg-[#0F172A] px-5 text-sm font-medium text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2"
+            className="group inline-flex min-h-11 items-center justify-center rounded-lg bg-[#0F172A] px-5 text-sm font-medium text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2"
           >
             Back to dashboard
             <span className="ml-2 transition-transform group-hover:translate-x-1">
@@ -51,10 +51,11 @@ export default function NotFound() {
           </button>
 
         </div>
-   {/* Logo */}
+
+        {/* Logo */}
         <Link
           href="/"
-          className="flex items-center gap-3 rounded-xl px-2 py-3 transition-colors hover:bg-white/5"
+          className="mx-auto mt-12 flex w-fit items-center gap-3 rounded-xl px-2 py-3 transition-opacity hover:opacity-80"
         >
           <Image
             src="/icon.png"
@@ -65,10 +66,11 @@ export default function NotFound() {
             className="h-10 w-10 object-contain"
           />
 
-          <span className="text-2xl font-extrabold tracking-tight">
+          <span className="text-2xl font-extrabold tracking-tight text-slate-900">
             Task<span className="text-cyan-400">Flow</span>
           </span>
         </Link>
+
       </section>
     </main>
   );
