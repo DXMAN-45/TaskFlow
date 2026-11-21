@@ -51,7 +51,24 @@ export default function NotFound() {
           </button>
 
         </div>
+   {/* Logo */}
+        <Link
+          href="/"
+          className="flex items-center gap-3 rounded-xl px-2 py-3 transition-colors hover:bg-white/5"
+        >
+          <Image
+            src="/icon.png"
+            alt="TaskFlow logo"
+            width={46}
+            height={46}
+            priority
+            className="h-10 w-10 object-contain"
+          />
 
+          <span className="text-2xl font-extrabold tracking-tight">
+            Task<span className="text-cyan-400">Flow</span>
+          </span>
+        </Link>
       </section>
     </main>
   );
