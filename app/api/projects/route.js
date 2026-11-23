@@ -1,9 +1,9 @@
-
 import { NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 
 import clientPromise from "../../../lib/mongodb";
 import { getCurrentUser } from "../../../lib/auth";
+import { ensureDefaultWorkspace } from "../../../lib/workspace";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -75,7 +75,9 @@ function validateProject(body) {
       return "Deadline must use YYYY-MM-DD format.";
     }
 
-    const date = new Date(`${body.deadline}T00:00:00.000Z`);
+    const date = new Date(
+      `${body.deadline}T00:00:00.000Z`
+    );
 
     if (
       Number.isNaN(date.getTime()) ||
@@ -88,7 +90,62 @@ function validateProject(body) {
   return null;
 }
 
-// GET: Fetch projects belonging to the logged-in user
+/**
+ * Resolve the user's active workspace
+ * and verify workspace membership.
+ */
+async function getActiveWorkspace(db, user) {
+  // Ensure the user has a default workspace.
+  await ensureDefaultWorkspace(db, user.id);
+
+  // Fetch the latest user document.
+  const userDocument = await db.collection("users").findOne({
+    _id: new ObjectId(user.id),
+  });
+
+  if (!userDocument?.activeWorkspaceId) {
+    return null;
+  }
+
+  const workspaceId = userDocument.activeWorkspaceId;
+
+  if (!ObjectId.isValid(workspaceId)) {
+    return null;
+  }
+
+  const workspaceObjectId = new ObjectId(workspaceId);
+
+  // Verify that the user belongs to this workspace.
+  const membership = await db
+    .collection("workspaceMembers")
+    .findOne({
+      workspaceId: workspaceObjectId,
+      userId: new ObjectId(user.id),
+    });
+
+  if (!membership) {
+    return null;
+  }
+
+  // Confirm the workspace still exists.
+  const workspace = await db.collection("workspaces").findOne({
+    _id: workspaceObjectId,
+  });
+
+  if (!workspace) {
+    return null;
+  }
+
+  return {
+    workspace,
+    membership,
+  };
+}
+
+// ============================================
+// GET: Fetch projects from active workspace
+// ============================================
+
 export async function GET() {
   try {
     const user = await getCurrentUser();
@@ -103,11 +160,26 @@ export async function GET() {
     const client = await clientPromise;
     const db = client.db(DB_NAME);
 
+    const activeWorkspace = await getActiveWorkspace(
+      db,
+      user
+    );
+
+    if (!activeWorkspace) {
+      return NextResponse.json(
+        { message: "Workspace not found or access denied." },
+        { status: 403 }
+      );
+    }
+
+    const workspaceId = activeWorkspace.workspace._id;
     const userId = new ObjectId(user.id);
 
     const projects = await db
       .collection("projects")
       .find({
+        workspaceId,
+
         $or: [
           { ownerId: userId },
           { "members.userId": userId },
@@ -117,7 +189,10 @@ export async function GET() {
       .toArray();
 
     return NextResponse.json(
-      { projects },
+      {
+        projects,
+        workspaceId,
+      },
       { status: 200 }
     );
   } catch (error) {
@@ -130,7 +205,10 @@ export async function GET() {
   }
 }
 
-// POST: Create a new project
+// ============================================
+// POST: Create a project in active workspace
+// ============================================
+
 export async function POST(request) {
   try {
     const user = await getCurrentUser();
@@ -156,17 +234,34 @@ export async function POST(request) {
     const client = await clientPromise;
     const db = client.db(DB_NAME);
 
+    const activeWorkspace = await getActiveWorkspace(
+      db,
+      user
+    );
+
+    if (!activeWorkspace) {
+      return NextResponse.json(
+        { message: "Workspace not found or access denied." },
+        { status: 403 }
+      );
+    }
+
+    const workspaceId = activeWorkspace.workspace._id;
+
     const userId = new ObjectId(user.id);
     const now = new Date();
 
     const project = {
+      workspaceId,
+
       name: body.name.trim(),
       description: body.description?.trim() || "",
       category: body.category?.trim() || "Other",
       priority: body.priority || "Medium",
       color: body.color || "indigo",
 
-      // Keep date-only values as strings to avoid timezone shifts.
+      // Keep date-only values as strings
+      // to avoid timezone shifts.
       deadline: body.deadline || null,
 
       ownerId: userId,
@@ -181,6 +276,7 @@ export async function POST(request) {
       ],
 
       archived: false,
+
       createdAt: now,
       updatedAt: now,
     };

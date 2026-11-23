@@ -1,9 +1,9 @@
-
 import { NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 
 import clientPromise from "../../../../lib/mongodb";
 import { getCurrentUser } from "../../../../lib/auth";
+import { ensureDefaultWorkspace } from "../../../../lib/workspace";
 
 import {
   isValidObjectId,
@@ -30,7 +30,10 @@ const editableFields = [
   "projectId",
 ];
 
-// Validate incoming task updates.
+// ============================================
+// VALIDATION
+// ============================================
+
 function validateUpdates(body) {
   if (!body || typeof body !== "object" || Array.isArray(body)) {
     return "Invalid request body.";
@@ -50,6 +53,7 @@ function validateUpdates(body) {
     return `Field "${invalidField}" cannot be updated.`;
   }
 
+  // TITLE
   if ("title" in body) {
     if (typeof body.title !== "string" || !body.title.trim()) {
       return "Task title is required.";
@@ -60,6 +64,7 @@ function validateUpdates(body) {
     }
   }
 
+  // DESCRIPTION
   if ("description" in body) {
     if (
       typeof body.description !== "string" ||
@@ -69,6 +74,7 @@ function validateUpdates(body) {
     }
   }
 
+  // PRIORITY
   if (
     "priority" in body &&
     !allowedPriorities.includes(body.priority)
@@ -76,6 +82,7 @@ function validateUpdates(body) {
     return "Invalid task priority.";
   }
 
+  // STATUS
   if (
     "status" in body &&
     !allowedStatuses.includes(body.status)
@@ -83,6 +90,7 @@ function validateUpdates(body) {
     return "Invalid task status.";
   }
 
+  // DUE DATE
   if (
     "dueDate" in body &&
     body.dueDate !== null &&
@@ -105,6 +113,7 @@ function validateUpdates(body) {
     }
   }
 
+  // ASSIGNEE
   if (
     "assignedTo" in body &&
     !isValidObjectId(body.assignedTo)
@@ -112,7 +121,7 @@ function validateUpdates(body) {
     return "Invalid assignee ID.";
   }
 
-  // Allow a valid project ID or null (Personal).
+  // PROJECT ID
   if (
     "projectId" in body &&
     body.projectId !== null &&
@@ -129,7 +138,58 @@ function validateUpdates(body) {
   return null;
 }
 
-// Get task, user, and project permission context.
+// ============================================
+// ACTIVE WORKSPACE
+// ============================================
+
+async function getActiveWorkspace(db, user) {
+  await ensureDefaultWorkspace(db, user.id);
+
+  const userDocument = await db.collection("users").findOne({
+    _id: new ObjectId(user.id),
+  });
+
+  if (!userDocument?.activeWorkspaceId) {
+    return null;
+  }
+
+  const workspaceId = userDocument.activeWorkspaceId;
+
+  if (!ObjectId.isValid(workspaceId)) {
+    return null;
+  }
+
+  const workspaceObjectId = new ObjectId(workspaceId);
+
+  // Verify workspace membership.
+  const membership = await db.collection("workspaceMembers").findOne({
+    workspaceId: workspaceObjectId,
+    userId: new ObjectId(user.id),
+  });
+
+  if (!membership) {
+    return null;
+  }
+
+  // Verify workspace existence.
+  const workspace = await db.collection("workspaces").findOne({
+    _id: workspaceObjectId,
+  });
+
+  if (!workspace) {
+    return null;
+  }
+
+  return {
+    workspace,
+    membership,
+  };
+}
+
+// ============================================
+// TASK CONTEXT
+// ============================================
+
 async function getTaskContext(params) {
   const user = await getCurrentUser();
 
@@ -156,6 +216,8 @@ async function getTaskContext(params) {
   const client = await clientPromise;
   const db = client.db(DB_NAME);
 
+  const userId = new ObjectId(user.id);
+
   const task = await db.collection("tasks").findOne({
     _id: new ObjectId(taskId),
   });
@@ -169,8 +231,12 @@ async function getTaskContext(params) {
     };
   }
 
-  // Personal task: only its creator can access it.
+  // ========================================
+  // PERSONAL TASK
+  // ========================================
+
   if (!task.projectId) {
+    // Only the creator can access personal tasks.
     if (task.createdBy?.toString() !== user.id) {
       return {
         error: NextResponse.json(
@@ -180,15 +246,44 @@ async function getTaskContext(params) {
       };
     }
 
-    return { db, task, user, role: null, project: null };
+    // Personal tasks remain independent of workspaces.
+    return {
+      db,
+      task,
+      user,
+      role: null,
+      project: null,
+      workspace: null,
+    };
   }
 
-  // Project task: user must belong to its project.
+  // ========================================
+  // PROJECT TASK
+  // ========================================
+
+  const activeWorkspace = await getActiveWorkspace(db, user);
+
+  if (!activeWorkspace) {
+    return {
+      error: NextResponse.json(
+        { message: "Workspace not found or access denied." },
+        { status: 403 }
+      ),
+    };
+  }
+
+  const workspace = activeWorkspace.workspace;
+  const workspaceId = workspace._id;
+
+  // Project must belong to the active workspace.
+  // User must also have access to that project.
   const project = await db.collection("projects").findOne({
     _id: task.projectId,
+    workspaceId,
+
     $or: [
-      { ownerId: new ObjectId(user.id) },
-      { "members.userId": new ObjectId(user.id) },
+      { ownerId: userId },
+      { "members.userId": userId },
     ],
   });
 
@@ -201,17 +296,43 @@ async function getTaskContext(params) {
     };
   }
 
+  // Protect against inconsistent task workspace data.
+  // Older tasks without workspaceId remain supported.
+  if (
+    task.workspaceId &&
+    task.workspaceId.toString() !== workspaceId.toString()
+  ) {
+    return {
+      error: NextResponse.json(
+        { message: "Task not found or access denied." },
+        { status: 404 }
+      ),
+    };
+  }
+
   const role = getProjectRole(project, user.id);
 
-  return { db, task, user, role, project };
+  return {
+    db,
+    task,
+    user,
+    role,
+    project,
+    workspace,
+  };
 }
 
-// GET: Fetch one task.
+// ============================================
+// GET: Fetch one task
+// ============================================
+
 export async function GET(request, { params }) {
   try {
     const context = await getTaskContext(params);
 
-    if (context.error) return context.error;
+    if (context.error) {
+      return context.error;
+    }
 
     const { task } = context;
 
@@ -241,14 +362,26 @@ export async function GET(request, { params }) {
   }
 }
 
-// PATCH: Update or move a task.
+// ============================================
+// PATCH: Update or move a task
+// ============================================
+
 export async function PATCH(request, { params }) {
   try {
     const context = await getTaskContext(params);
 
-    if (context.error) return context.error;
+    if (context.error) {
+      return context.error;
+    }
 
-    const { db, task, user, role, project } = context;
+    const {
+      db,
+      task,
+      user,
+      role,
+      project,
+      workspace,
+    } = context;
 
     const body = await request.json();
 
@@ -263,7 +396,10 @@ export async function PATCH(request, { params }) {
 
     const isPersonalTask = !task.projectId;
 
-    // Handle Personal <-> Project movement.
+    // ========================================
+    // PERSONAL <-> PROJECT MOVEMENT
+    // ========================================
+
     if ("projectId" in body) {
       // PERSONAL -> PROJECT
       if (isPersonalTask) {
@@ -274,11 +410,27 @@ export async function PATCH(request, { params }) {
           );
         }
 
+        // Resolve the active workspace.
+        const activeWorkspace = await getActiveWorkspace(db, user);
+
+        if (!activeWorkspace) {
+          return NextResponse.json(
+            { message: "Workspace not found or access denied." },
+            { status: 403 }
+          );
+        }
+
+        const activeWorkspaceId =
+          activeWorkspace.workspace._id;
+
+        // Destination project must belong to the active workspace.
         const destinationProject = await db
           .collection("projects")
           .findOne({
             _id: new ObjectId(body.projectId),
+            workspaceId: activeWorkspaceId,
             archived: { $ne: true },
+
             $or: [
               { ownerId: new ObjectId(user.id) },
               { "members.userId": new ObjectId(user.id) },
@@ -312,8 +464,13 @@ export async function PATCH(request, { params }) {
             { status: 403 }
           );
         }
-      } else {
-        // PROJECT -> PERSONAL
+
+        // Store the destination workspace.
+        body.destinationWorkspaceId = activeWorkspaceId;
+      }
+
+      // PROJECT -> PERSONAL
+      else {
         if (body.projectId !== null) {
           return NextResponse.json(
             {
@@ -336,7 +493,10 @@ export async function PATCH(request, { params }) {
       }
     }
 
-    // Check permission to update the existing task.
+    // ========================================
+    // UPDATE PERMISSIONS
+    // ========================================
+
     if (isPersonalTask) {
       if (task.createdBy?.toString() !== user.id) {
         return NextResponse.json(
@@ -358,12 +518,14 @@ export async function PATCH(request, { params }) {
         );
       }
 
-      // Assigned project members can only update status.
+      // Members can only update task status.
       if (role === "member") {
         const requestedFields = Object.keys(body);
 
         if (
-          requestedFields.some((field) => field !== "status")
+          requestedFields.some(
+            (field) => field !== "status"
+          )
         ) {
           return NextResponse.json(
             {
@@ -376,7 +538,10 @@ export async function PATCH(request, { params }) {
       }
     }
 
-    // Personal tasks cannot be reassigned directly.
+    // ========================================
+    // PERSONAL TASK REASSIGNMENT
+    // ========================================
+
     if (isPersonalTask && "assignedTo" in body) {
       return NextResponse.json(
         { message: "Personal tasks cannot be reassigned." },
@@ -384,9 +549,15 @@ export async function PATCH(request, { params }) {
       );
     }
 
-    // Only project owners and admins can reassign project tasks.
+    // ========================================
+    // PROJECT TASK REASSIGNMENT
+    // ========================================
+
     if ("assignedTo" in body) {
-      if (!project || (role !== "owner" && role !== "admin")) {
+      if (
+        !project ||
+        (role !== "owner" && role !== "admin")
+      ) {
         return NextResponse.json(
           { message: "You cannot reassign this task." },
           { status: 403 }
@@ -411,7 +582,10 @@ export async function PATCH(request, { params }) {
       }
     }
 
-    // Prepare database updates.
+    // ========================================
+    // PREPARE UPDATES
+    // ========================================
+
     const updates = {};
 
     for (const [key, value] of Object.entries(body)) {
@@ -420,7 +594,6 @@ export async function PATCH(request, { params }) {
       } else if (key === "dueDate") {
         updates.dueDate = value || null;
       } else if (key === "projectId") {
-        // null means Personal; otherwise convert to ObjectId.
         updates.projectId = value
           ? new ObjectId(value)
           : null;
@@ -431,21 +604,67 @@ export async function PATCH(request, { params }) {
       }
     }
 
-    // When moving a task, the person moving it becomes its assignee.
-    if ("projectId" in body) {
+    // ========================================
+    // WORKSPACE ID
+    // ========================================
+
+    // PERSONAL -> PROJECT
+    if (isPersonalTask && "projectId" in body) {
+      updates.workspaceId = body.destinationWorkspaceId;
+
+      // The person moving the task becomes its assignee.
+      updates.assignedTo = new ObjectId(user.id);
+
+      delete updates.destinationWorkspaceId;
+    }
+
+    // PROJECT -> PERSONAL
+    if (!isPersonalTask && "projectId" in body) {
+      updates.workspaceId = null;
+
+      // The person moving the task becomes its assignee.
       updates.assignedTo = new ObjectId(user.id);
     }
 
     updates.updatedAt = new Date();
 
+    // ========================================
+    // DATABASE UPDATE
+    // ========================================
+
+    let updateFilter;
+
+    if (isPersonalTask) {
+      updateFilter = {
+        _id: task._id,
+        createdBy: new ObjectId(user.id),
+        projectId: null,
+      };
+    } else {
+      updateFilter = {
+        _id: task._id,
+        projectId: task.projectId,
+        workspaceId: workspace._id,
+      };
+    }
+
     await db.collection("tasks").updateOne(
-      { _id: task._id },
-      { $set: updates }
+      updateFilter,
+      {
+        $set: updates,
+      }
     );
 
     const updatedTask = await db.collection("tasks").findOne({
       _id: task._id,
     });
+
+    if (!updatedTask) {
+      return NextResponse.json(
+        { message: "Task not found." },
+        { status: 404 }
+      );
+    }
 
     const today = new Date().toISOString().slice(0, 10);
 
@@ -474,14 +693,23 @@ export async function PATCH(request, { params }) {
   }
 }
 
-// DELETE: Delete a task.
+// ============================================
+// DELETE: Delete a task
+// ============================================
+
 export async function DELETE(request, { params }) {
   try {
     const context = await getTaskContext(params);
 
-    if (context.error) return context.error;
+    if (context.error) {
+      return context.error;
+    }
 
-    const { db, task, user, role } = context;
+    const { db, task, user, role, workspace } = context;
+
+    // ========================================
+    // PROJECT TASK
+    // ========================================
 
     if (task.projectId) {
       if (!canDeleteProjectTask(role)) {
@@ -493,18 +721,32 @@ export async function DELETE(request, { params }) {
           { status: 403 }
         );
       }
-    } else {
+
+      await db.collection("tasks").deleteOne({
+        _id: task._id,
+        projectId: task.projectId,
+        workspaceId: workspace._id,
+      });
+    }
+
+    // ========================================
+    // PERSONAL TASK
+    // ========================================
+
+    else {
       if (task.createdBy?.toString() !== user.id) {
         return NextResponse.json(
           { message: "You cannot delete this task." },
           { status: 403 }
         );
       }
-    }
 
-    await db.collection("tasks").deleteOne({
-      _id: task._id,
-    });
+      await db.collection("tasks").deleteOne({
+        _id: task._id,
+        createdBy: new ObjectId(user.id),
+        projectId: null,
+      });
+    }
 
     return NextResponse.json(
       { message: "Task deleted successfully." },

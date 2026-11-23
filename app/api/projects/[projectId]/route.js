@@ -1,9 +1,9 @@
-
 import { NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 
 import clientPromise from "../../../../lib/mongodb";
 import { getCurrentUser } from "../../../../lib/auth";
+import { ensureDefaultWorkspace } from "../../../../lib/workspace";
 import {
   isValidObjectId,
   getProjectRole,
@@ -36,6 +36,10 @@ const editableFields = [
   "deadline",
   "archived",
 ];
+
+// ============================================
+// VALIDATION
+// ============================================
 
 function validateUpdates(body) {
   if (
@@ -104,7 +108,10 @@ function validateUpdates(body) {
     return "Invalid project color.";
   }
 
-  if ("archived" in body && typeof body.archived !== "boolean") {
+  if (
+    "archived" in body &&
+    typeof body.archived !== "boolean"
+  ) {
     return "Archived must be true or false.";
   }
 
@@ -120,7 +127,9 @@ function validateUpdates(body) {
       return "Deadline must use YYYY-MM-DD format.";
     }
 
-    const date = new Date(`${body.deadline}T00:00:00.000Z`);
+    const date = new Date(
+      `${body.deadline}T00:00:00.000Z`
+    );
 
     if (
       Number.isNaN(date.getTime()) ||
@@ -132,6 +141,58 @@ function validateUpdates(body) {
 
   return null;
 }
+
+// ============================================
+// ACTIVE WORKSPACE
+// ============================================
+
+async function getActiveWorkspace(db, user) {
+  await ensureDefaultWorkspace(db, user.id);
+
+  const userDocument = await db.collection("users").findOne({
+    _id: new ObjectId(user.id),
+  });
+
+  if (!userDocument?.activeWorkspaceId) {
+    return null;
+  }
+
+  const workspaceId = userDocument.activeWorkspaceId;
+
+  if (!ObjectId.isValid(workspaceId)) {
+    return null;
+  }
+
+  const workspaceObjectId = new ObjectId(workspaceId);
+
+  const membership = await db
+    .collection("workspaceMembers")
+    .findOne({
+      workspaceId: workspaceObjectId,
+      userId: new ObjectId(user.id),
+    });
+
+  if (!membership) {
+    return null;
+  }
+
+  const workspace = await db.collection("workspaces").findOne({
+    _id: workspaceObjectId,
+  });
+
+  if (!workspace) {
+    return null;
+  }
+
+  return {
+    workspace,
+    membership,
+  };
+}
+
+// ============================================
+// PROJECT CONTEXT
+// ============================================
 
 async function getProjectContext(params) {
   const user = await getCurrentUser();
@@ -159,11 +220,32 @@ async function getProjectContext(params) {
   const client = await clientPromise;
   const db = client.db(DB_NAME);
 
+  // Resolve active workspace.
+  const activeWorkspace = await getActiveWorkspace(
+    db,
+    user
+  );
+
+  if (!activeWorkspace) {
+    return {
+      error: NextResponse.json(
+        { message: "Workspace not found or access denied." },
+        { status: 403 }
+      ),
+    };
+  }
+
+  const workspaceId = activeWorkspace.workspace._id;
+  const userId = new ObjectId(user.id);
+
+  // Fetch project only from active workspace.
   const project = await db.collection("projects").findOne({
     _id: new ObjectId(projectId),
+    workspaceId,
+
     $or: [
-      { ownerId: new ObjectId(user.id) },
-      { "members.userId": new ObjectId(user.id) },
+      { ownerId: userId },
+      { "members.userId": userId },
     ],
   });
 
@@ -183,22 +265,32 @@ async function getProjectContext(params) {
     project,
     user,
     role,
+    workspaceId,
+    workspaceMembership: activeWorkspace.membership,
   };
 }
 
+// ============================================
 // GET: Fetch one project
+// ============================================
+
 export async function GET(request, { params }) {
   try {
     const context = await getProjectContext(params);
 
-    if (context.error) return context.error;
+    if (context.error) {
+      return context.error;
+    }
 
     return NextResponse.json(
       { project: context.project },
       { status: 200 }
     );
   } catch (error) {
-    console.error("GET /api/projects/[projectId] error:", error);
+    console.error(
+      "GET /api/projects/[projectId] error:",
+      error
+    );
 
     return NextResponse.json(
       { message: "Unable to fetch project." },
@@ -207,18 +299,26 @@ export async function GET(request, { params }) {
   }
 }
 
-// PATCH: Update project details or archive status
+// ============================================
+// PATCH: Update project
+// ============================================
+
 export async function PATCH(request, { params }) {
   try {
     const context = await getProjectContext(params);
 
-    if (context.error) return context.error;
+    if (context.error) {
+      return context.error;
+    }
 
-    const { db, project, role } = context;
+    const { db, project, role, workspaceId } = context;
 
     if (!canManageProject(role)) {
       return NextResponse.json(
-        { message: "You do not have permission to update this project." },
+        {
+          message:
+            "You do not have permission to update this project.",
+        },
         { status: 403 }
       );
     }
@@ -252,14 +352,23 @@ export async function PATCH(request, { params }) {
 
     updates.updatedAt = new Date();
 
+    // Update only inside the active workspace.
     await db.collection("projects").updateOne(
-      { _id: project._id },
-      { $set: updates }
+      {
+        _id: project._id,
+        workspaceId,
+      },
+      {
+        $set: updates,
+      }
     );
 
-    const updatedProject = await db.collection("projects").findOne({
-      _id: project._id,
-    });
+    const updatedProject = await db
+      .collection("projects")
+      .findOne({
+        _id: project._id,
+        workspaceId,
+      });
 
     return NextResponse.json(
       {
@@ -269,7 +378,10 @@ export async function PATCH(request, { params }) {
       { status: 200 }
     );
   } catch (error) {
-    console.error("PATCH /api/projects/[projectId] error:", error);
+    console.error(
+      "PATCH /api/projects/[projectId] error:",
+      error
+    );
 
     return NextResponse.json(
       { message: "Unable to update project." },
@@ -278,30 +390,40 @@ export async function PATCH(request, { params }) {
   }
 }
 
-// DELETE: Delete project and its associated tasks
+// ============================================
+// DELETE: Delete project and associated tasks
+// ============================================
+
 export async function DELETE(request, { params }) {
   try {
     const context = await getProjectContext(params);
 
-    if (context.error) return context.error;
+    if (context.error) {
+      return context.error;
+    }
 
-    const { db, project, role, user } = context;
+    const { db, project, role, workspaceId, user } =
+      context;
 
     if (!canDeleteProject(role)) {
       return NextResponse.json(
-        { message: "Only the project owner can delete this project." },
+        {
+          message:
+            "Only the project owner can delete this project.",
+        },
         { status: 403 }
       );
     }
 
-    // Delete tasks belonging to this project first.
+    // Delete only tasks associated with this project.
     await db.collection("tasks").deleteMany({
       projectId: project._id,
     });
 
-    // Delete the project only if the current user owns it.
+    // Delete only the project inside this workspace.
     const result = await db.collection("projects").deleteOne({
       _id: project._id,
+      workspaceId,
       ownerId: new ObjectId(user.id),
     });
 
@@ -313,11 +435,17 @@ export async function DELETE(request, { params }) {
     }
 
     return NextResponse.json(
-      { message: "Project and its tasks deleted successfully." },
+      {
+        message:
+          "Project and its tasks deleted successfully.",
+      },
       { status: 200 }
     );
   } catch (error) {
-    console.error("DELETE /api/projects/[projectId] error:", error);
+    console.error(
+      "DELETE /api/projects/[projectId] error:",
+      error
+    );
 
     return NextResponse.json(
       { message: "Unable to delete project." },
