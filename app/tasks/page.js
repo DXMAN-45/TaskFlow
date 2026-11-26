@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -123,6 +122,17 @@ export default function TaskPage() {
 
   const [formError, setFormError] = useState("");
 
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isEditingTask, setIsEditingTask] = useState(false);
+  const [editError, setEditError] = useState("");
+  const [editForm, setEditForm] = useState({
+    title: "",
+    description: "",
+    priority: "Medium",
+    dueDate: "",
+    assignedTo: "",
+  });
+
   // ========================================
   // CREATE TASK FORM
   // ========================================
@@ -246,7 +256,7 @@ export default function TaskPage() {
 
             priority: task.priority || "Medium",
             status: task.status || "To do",
-            dueDate: task.dueDate || null,
+            dueDate: toDateOnly(task.dueDate),
             createdAt: toDateOnly(task.createdAt),
             overdue: Boolean(task.overdue),
           };
@@ -390,6 +400,22 @@ export default function TaskPage() {
         task.assignedToId === currentUserId
       )
     );
+  };
+
+  const canManageTaskDetails = (task) => {
+    if (!task.projectId) {
+      return task.createdById === currentUserId;
+    }
+
+    const role = getProjectRole(task.projectId);
+    return role === "owner" || role === "admin";
+  };
+
+  const canReassignTask = (task) => {
+    if (!task.projectId) return false;
+
+    const role = getProjectRole(task.projectId);
+    return role === "owner" || role === "admin";
   };
 
   // ========================================
@@ -589,6 +615,29 @@ export default function TaskPage() {
       if (!response.ok) {
         throw new Error(
           data.message || "Unable to update task."
+        );
+      }
+
+      if (data.task) {
+        setTasks((current) =>
+          current.map((item) =>
+            item.id === taskId
+              ? {
+                ...item,
+                status: data.task.status || nextStatus,
+                overdue: Boolean(data.task.overdue),
+              }
+              : item
+          )
+        );
+        setSelectedTask((current) =>
+          current?.id === taskId
+            ? {
+              ...current,
+              status: data.task.status || nextStatus,
+              overdue: Boolean(data.task.overdue),
+            }
+            : current
         );
       }
     } catch (error) {
@@ -812,6 +861,112 @@ if (!selectedTask || selectedTask.projectId || !moveProjectId || isMovingTask) {
     setSelectedTask(null);
     resetForm();
     setIsCreateOpen(true);
+  };
+
+  const openEditTask = (task) => {
+    if (!canManageTaskDetails(task)) return;
+
+    setEditForm({
+      title: task.title,
+      description: task.description || "",
+      priority: task.priority || "Medium",
+      dueDate: task.dueDate ? toDateOnly(task.dueDate) || "" : "",
+      assignedTo: task.assignedToId || "",
+    });
+    setEditError("");
+    setIsEditOpen(true);
+  };
+
+  const handleEditTask = async (event) => {
+    event.preventDefault();
+
+    if (!selectedTask || !canManageTaskDetails(selectedTask) || isEditingTask) {
+      return;
+    }
+
+    const title = editForm.title.trim();
+
+    if (!title) {
+      setEditError("Please enter a task title.");
+      return;
+    }
+
+    if (title.length > 150) {
+      setEditError("Task title cannot exceed 150 characters.");
+      return;
+    }
+
+    if (editForm.description.length > 3000) {
+      setEditError("Task description cannot exceed 3000 characters.");
+      return;
+    }
+
+    setIsEditingTask(true);
+    setEditError("");
+
+    try {
+      const payload = {
+        title,
+        description: editForm.description,
+        priority: editForm.priority,
+        dueDate: editForm.dueDate || null,
+      };
+
+      if (
+        selectedTask.projectId &&
+        canReassignTask(selectedTask) &&
+        editForm.assignedTo
+      ) {
+        payload.assignedTo = editForm.assignedTo;
+      }
+
+      const response = await fetch(`/api/tasks/${selectedTask.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Unable to update task.");
+      }
+
+      const updatedTask = data.task;
+      const project = updatedTask.projectId
+        ? getProjectById(updatedTask.projectId)
+        : null;
+      const assignee = project?.members?.find(
+        (member) => String(member.userId) === String(updatedTask.assignedTo)
+      );
+
+      const normalizedUpdate = {
+        ...selectedTask,
+        title: updatedTask.title,
+        description: updatedTask.description || "",
+        priority: updatedTask.priority || editForm.priority,
+        dueDate: updatedTask.dueDate || null,
+        assignedToId: String(updatedTask.assignedTo || selectedTask.assignedToId),
+        assignedTo:
+          String(updatedTask.assignedTo) === currentUserId
+            ? currentUserName
+            : assignee?.name || selectedTask.assignedTo,
+        overdue: Boolean(updatedTask.overdue),
+      };
+
+      setTasks((current) =>
+        current.map((task) =>
+          task.id === selectedTask.id ? normalizedUpdate : task
+        )
+      );
+      setSelectedTask(normalizedUpdate);
+      setIsEditOpen(false);
+      setEditError("");
+    } catch (error) {
+      setEditError(error.message || "Unable to update task.");
+    } finally {
+      setIsEditingTask(false);
+    }
   };
 
   // ========================================
@@ -1059,28 +1214,77 @@ if (!selectedTask || selectedTask.projectId || !moveProjectId || isMovingTask) {
 
                     {/* TASK TITLE */}
 
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedTask(task);
-                        setMoveProjectId("");
-                        setMoveError("");
-                      }}
-                      className="min-w-0 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
-                      aria-label={`View task: ${task.title}`}
-                    >
-                      <p className="truncate text-sm font-bold text-slate-800">
-                        {task.title}
-                      </p>
+                    <div className="flex min-w-0 items-start gap-3">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          updateStatus(
+                            task.id,
+                            task.status === "Completed" ? "To do" : "Completed"
+                          )
+                        }
+                        disabled={!canUpdateTask(task)}
+                        aria-label={
+                          task.status === "Completed"
+                            ? `Mark ${task.title} as To do`
+                            : `Mark ${task.title} as Completed`
+                        }
+                        title={
+                          canUpdateTask(task)
+                            ? "Change completion status"
+                            : "You cannot update this task"
+                        }
+                        className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 text-sm font-bold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 ${
+                          task.status === "Completed"
+                            ? "border-emerald-500 bg-emerald-500 text-white shadow-sm"
+                            : "border-slate-300 bg-white text-transparent hover:border-blue-400"
+                        } ${!canUpdateTask(task) ? "cursor-not-allowed opacity-45" : "active:scale-90"}`}
+                      >
+                        <span aria-hidden="true">✓</span>
+                      </button>
 
-                      <p className="mt-1 line-clamp-1 text-xs text-slate-400">
-                        {task.description || "No description"}
-                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedTask(task);
+                          setMoveProjectId("");
+                          setMoveError("");
+                        }}
+                        className="min-w-0 flex-1 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+                        aria-label={`View task: ${task.title}`}
+                      >
+                        <p
+                          className={`truncate text-sm font-bold transition-colors ${
+                            task.status === "Completed"
+                              ? "text-slate-400 line-through decoration-slate-300"
+                              : "text-slate-800"
+                          }`}
+                        >
+                          {task.title}
+                        </p>
 
-                      <p className="mt-2 text-xs text-slate-500 md:hidden">
-                        Assigned to {task.assignedTo}
-                      </p>
-                    </button>
+                        <p className="mt-1 line-clamp-1 text-xs text-slate-400">
+                          {task.description || "No description"}
+                        </p>
+
+                        <p className="mt-2 text-xs font-medium text-blue-600 md:hidden">
+                          Manage task
+                        </p>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedTask(task);
+                          setMoveProjectId("");
+                          setMoveError("");
+                        }}
+                        className="hidden min-h-9 shrink-0 items-center rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 md:flex"
+                        aria-label={`Manage task: ${task.title}`}
+                      >
+                        Manage
+                      </button>
+                    </div>
 
                     {/* PROJECT */}
 
@@ -1544,7 +1748,7 @@ if (!selectedTask || selectedTask.projectId || !moveProjectId || isMovingTask) {
           TASK DETAILS MODAL
       ====================================== */}
 
-      {selectedTask && !isCreateOpen && (
+      {selectedTask && !isCreateOpen && !isEditOpen && (
         <div
           className="fixed inset-0 z-[90] flex items-end justify-center bg-slate-950/40 p-0 backdrop-blur-sm sm:items-center sm:p-5"
           onMouseDown={(event) => {
@@ -1767,6 +1971,18 @@ if (!selectedTask || selectedTask.projectId || !moveProjectId || isMovingTask) {
               )}
             </div>
 
+            {/* EDIT TASK */}
+
+            {canManageTaskDetails(selectedTask) && (
+              <button
+                type="button"
+                onClick={() => openEditTask(selectedTask)}
+                className="mt-5 min-h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
+              >
+                Edit task
+              </button>
+            )}
+
             {/* DELETE BUTTON */}
 
             {canDeleteTask(selectedTask) && (
@@ -1844,6 +2060,169 @@ if (!selectedTask || selectedTask.projectId || !moveProjectId || isMovingTask) {
                 Yes, delete task
               </button>
             </div>
+          </section>
+        </div>
+      )}
+
+      {/* ======================================
+          EDIT TASK MODAL
+      ====================================== */}
+
+      {isEditOpen && selectedTask && (
+        <div
+          className="fixed inset-0 z-[110] flex items-end justify-center bg-slate-950/50 p-0 backdrop-blur-sm sm:items-center sm:p-5"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !isEditingTask) {
+              setIsEditOpen(false);
+              setEditError("");
+            }
+          }}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="edit-task-title"
+            className="max-h-[92dvh] w-full max-w-2xl overflow-y-auto rounded-t-3xl bg-white shadow-2xl sm:rounded-3xl"
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 px-5 py-5 sm:px-7">
+              <div>
+                <h2 id="edit-task-title" className="text-xl font-extrabold text-slate-900">
+                  Edit task
+                </h2>
+                <p className="mt-1 text-sm text-slate-500">Update the task details.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!isEditingTask) {
+                    setIsEditOpen(false);
+                    setEditError("");
+                  }
+                }}
+                aria-label="Close edit task dialog"
+                className="flex h-11 w-11 items-center justify-center rounded-xl text-xl text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+              >
+                ×
+              </button>
+            </div>
+
+            <form onSubmit={handleEditTask} className="space-y-5 p-5 sm:p-7">
+              <div>
+                <label htmlFor="edit-task-title-input" className="mb-2 block text-sm font-semibold text-slate-700">
+                  Task title <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  id="edit-task-title-input"
+                  type="text"
+                  required
+                  maxLength={150}
+                  autoFocus
+                  value={editForm.title}
+                  onChange={(event) => {
+                    setEditForm((current) => ({ ...current, title: event.target.value }));
+                    setEditError("");
+                  }}
+                  className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 text-base text-slate-800 outline-none transition focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-500/10 sm:text-sm"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="edit-task-description" className="mb-2 block text-sm font-semibold text-slate-700">
+                  Description
+                </label>
+                <textarea
+                  id="edit-task-description"
+                  rows={4}
+                  maxLength={3000}
+                  value={editForm.description}
+                  onChange={(event) => setEditForm((current) => ({ ...current, description: event.target.value }))
+                  }
+                  className="w-full resize-y rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-base text-slate-800 outline-none transition focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-500/10 sm:text-sm"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="edit-task-priority" className="mb-2 block text-sm font-semibold text-slate-700">
+                    Priority
+                  </label>
+                  <select
+                    id="edit-task-priority"
+                    value={editForm.priority}
+                    onChange={(event) => setEditForm((current) => ({ ...current, priority: event.target.value }))
+                    }
+                    className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 text-base text-slate-700 outline-none transition focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-500/10 sm:text-sm"
+                  >
+                    <option value="Low">Low</option>
+                    <option value="Medium">Medium</option>
+                    <option value="High">High</option>
+                    <option value="Urgent">Urgent</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label htmlFor="edit-task-due-date" className="mb-2 block text-sm font-semibold text-slate-700">
+                    Due date <span className="text-xs font-normal text-slate-400">(Optional)</span>
+                  </label>
+                  <input
+                    id="edit-task-due-date"
+                    type="date"
+                    value={editForm.dueDate}
+                    onChange={(event) => setEditForm((current) => ({ ...current, dueDate: event.target.value }))
+                    }
+                    className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 text-base text-slate-700 outline-none transition focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-500/10 sm:text-sm"
+                  />
+                </div>
+
+                {selectedTask.projectId && canReassignTask(selectedTask) && (
+                  <div className="sm:col-span-2">
+                    <label htmlFor="edit-task-assignee" className="mb-2 block text-sm font-semibold text-slate-700">
+                      Assign to
+                    </label>
+                    <select
+                      id="edit-task-assignee"
+                      value={editForm.assignedTo}
+                      onChange={(event) => setEditForm((current) => ({ ...current, assignedTo: event.target.value }))
+                      }
+                      className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 text-base text-slate-700 outline-none transition focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-500/10 sm:text-sm"
+                    >
+                      {getAvailableAssignees(selectedTask.projectId).map((member) => (
+                        <option key={member.userId} value={member.userId}>
+                          {member.userId === currentUserId ? `${member.name} (Me)` : member.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+
+              {editError && (
+                <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                  {editError}
+                </p>
+              )}
+
+              <div className="flex flex-col-reverse gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  disabled={isEditingTask}
+                  onClick={() => {
+                    setIsEditOpen(false);
+                    setEditError("");
+                  }}
+                  className="min-h-12 rounded-xl border border-slate-200 px-5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isEditingTask}
+                  className="min-h-12 rounded-xl bg-blue-600 px-6 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isEditingTask ? "Saving..." : "Save changes"}
+                </button>
+              </div>
+            </form>
           </section>
         </div>
       )}
