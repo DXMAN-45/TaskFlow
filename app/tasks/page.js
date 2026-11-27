@@ -667,10 +667,10 @@ export default function TaskPage() {
   // ========================================
 
   const handleMoveTaskToProject = async () => {
-if (!selectedTask || selectedTask.projectId || !moveProjectId || isMovingTask) {
-  return;
-}
-    
+    if (!selectedTask || selectedTask.projectId || !moveProjectId || isMovingTask) {
+      return;
+    }
+
 
     const selectedProject = projects.find(
       (project) => String(project._id) === moveProjectId
@@ -1234,11 +1234,10 @@ if (!selectedTask || selectedTask.projectId || !moveProjectId || isMovingTask) {
                             ? "Change completion status"
                             : "You cannot update this task"
                         }
-                        className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 text-sm font-bold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 ${
-                          task.status === "Completed"
+                        className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 text-sm font-bold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 ${task.status === "Completed"
                             ? "border-emerald-500 bg-emerald-500 text-white shadow-sm"
                             : "border-slate-300 bg-white text-transparent hover:border-blue-400"
-                        } ${!canUpdateTask(task) ? "cursor-not-allowed opacity-45" : "active:scale-90"}`}
+                          } ${!canUpdateTask(task) ? "cursor-not-allowed opacity-45" : "active:scale-90"}`}
                       >
                         <span aria-hidden="true">✓</span>
                       </button>
@@ -1254,11 +1253,10 @@ if (!selectedTask || selectedTask.projectId || !moveProjectId || isMovingTask) {
                         aria-label={`View task: ${task.title}`}
                       >
                         <p
-                          className={`truncate text-sm font-bold transition-colors ${
-                            task.status === "Completed"
+                          className={`truncate text-sm font-bold transition-colors ${task.status === "Completed"
                               ? "text-slate-400 line-through decoration-slate-300"
                               : "text-slate-800"
-                          }`}
+                            }`}
                         >
                           {task.title}
                         </p>
