@@ -1355,7 +1355,7 @@ export default function TaskPage() {
                               To do
                             </option>
                             <option value="In progress">
-                              In progress
+                              In progresss
                             </option>
                             <option value="Completed">
                               Completed
