@@ -86,7 +86,22 @@ function validateProject(body) {
       return "Invalid deadline.";
     }
   }
+if (
+  body.memberIds !== undefined &&
+  (!Array.isArray(body.memberIds) ||
+    body.memberIds.some(
+      (id) => typeof id !== "string" || !ObjectId.isValid(id)
+    ))
+) {
+  return "Invalid project members.";
+}
 
+if (
+  body.memberIds &&
+  new Set(body.memberIds).size !== body.memberIds.length
+) {
+  return "Duplicate project members are not allowed.";
+}
   return null;
 }
 
@@ -251,35 +266,65 @@ export async function POST(request) {
     const userId = new ObjectId(user.id);
     const now = new Date();
 
-    const project = {
-      workspaceId,
+ const requestedMemberIds = body.memberIds || [];
 
-      name: body.name.trim(),
-      description: body.description?.trim() || "",
-      category: body.category?.trim() || "Other",
-      priority: body.priority || "Medium",
-      color: body.color || "indigo",
+const memberObjectIds = requestedMemberIds
+  .filter((id) => id !== user.id)
+  .map((id) => new ObjectId(id));
 
-      // Keep date-only values as strings
-      // to avoid timezone shifts.
-      deadline: body.deadline || null,
+// Verify every selected member belongs to this workspace.
+const workspaceMembers = await db
+  .collection("workspaceMembers")
+  .find({
+    workspaceId,
+    userId: { $in: memberObjectIds },
+  })
+  .toArray();
 
-      ownerId: userId,
+if (workspaceMembers.length !== memberObjectIds.length) {
+  return NextResponse.json(
+    {
+      message:
+        "One or more selected users are not members of this workspace.",
+    },
+    { status: 400 }
+  );
+}
 
-      members: [
-        {
-          userId,
-          name: user.name || "Project owner",
-          role: "owner",
-          joinedAt: now,
-        },
-      ],
 
-      archived: false,
+const projectMembers = [
+  {
+    userId,
+    name: user.name || "Project owner",
+    role: "owner",
+    joinedAt: now,
+  },
+  ...workspaceMembers.map((member) => ({
+    userId: member.userId,
+    name: member.name || "Workspace member",
+    role: "member",
+    joinedAt: now,
+  })),
+];
 
-      createdAt: now,
-      updatedAt: now,
-    };
+const project = {
+  workspaceId,
+
+  name: body.name.trim(),
+  description: body.description?.trim() || "",
+  category: body.category?.trim() || "Other",
+  priority: body.priority || "Medium",
+  color: body.color || "indigo",
+  deadline: body.deadline || null,
+
+  ownerId: userId,
+  members: projectMembers,
+
+  archived: false,
+
+  createdAt: now,
+  updatedAt: now,
+};
 
     const result = await db
       .collection("projects")

@@ -534,6 +534,10 @@ export default function ProjectsPage() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleteTaskTarget, setDeleteTaskTarget] = useState(null);
 
+  const [workspaceMembers, setWorkspaceMembers] = useState([]);
+const [selectedMemberIds, setSelectedMemberIds] = useState([]);
+const [membersLoading, setMembersLoading] = useState(false);
+
   const refreshData = useCallback(async () => {
     const [projectsResponse, tasksResponse, sessionResponse] = await Promise.all([
       fetch("/api/projects", { cache: "no-store" }),
@@ -624,6 +628,52 @@ export default function ProjectsPage() {
     });
   }, []);
 
+useEffect(() => {
+  if (!showProjectModal || editingId) return;
+
+  let active = true;
+
+  const fetchWorkspaceMembers = async () => {
+    try {
+      setMembersLoading(true);
+
+      const response = await fetch("/api/workspaces/members", {
+        cache: "no-store",
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.message || "Unable to load workspace members."
+        );
+      }
+
+      if (active) {
+        setWorkspaceMembers(
+          (data.members || []).filter(
+            (member) => member.userId !== currentUser.id
+          )
+        );
+      }
+    } catch (error) {
+      if (active) {
+        notify(error.message);
+      }
+    } finally {
+      if (active) {
+        setMembersLoading(false);
+      }
+    }
+  };
+
+  fetchWorkspaceMembers();
+
+  return () => {
+    active = false;
+  };
+}, [showProjectModal, editingId, currentUser.id]);
+
   useEffect(() => {
     let active = true;
     (async () => {
@@ -710,13 +760,13 @@ export default function ProjectsPage() {
   };
 
   // CREATE / EDIT PROJECT
-  const startCreateProject = () => {
-    setProjectForm(defaultProjectForm);
-    setEditingId(null);
-    setShowProjectModal(true);
-    setOpenMenu(null);
-  };
-
+const startCreateProject = () => {
+  setProjectForm(defaultProjectForm);
+  setSelectedMemberIds([]);
+  setEditingId(null);
+  setShowProjectModal(true);
+  setOpenMenu(null);
+};
   const startEditProject = (project) => {
     if (!canManageProject(project, currentUser.id)) {
       notify("Only project owners and admins can edit this project.");
@@ -749,11 +799,19 @@ export default function ProjectsPage() {
         {
           method: editingId ? "PATCH" : "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...projectForm, name }),
+          body: JSON.stringify({
+  ...projectForm,
+  name,
+  ...(editingId ? {} : { memberIds: selectedMemberIds }),
+}),
         }
       );
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Could not save project.");
+     if (!response.ok) {
+  throw new Error(
+    data.message || data.error || "Could not save project."
+  );
+}
 
       await refreshData();
       setShowProjectModal(false);
@@ -1588,7 +1646,87 @@ export default function ProjectsPage() {
                 </div>
               </div>
 
+{!editingId && (
+  <div className="rounded-xl border border-slate-200 p-4">
+    <div className="mb-3 flex items-center justify-between gap-2">
+      <div>
+        <h4 className="text-sm font-semibold text-slate-800">
+          Project members
+        </h4>
+        <p className="mt-1 text-xs text-slate-400">
+          Select workspace members to collaborate.
+        </p>
+      </div>
+
+      <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-600">
+        {selectedMemberIds.length} selected
+      </span>
+    </div>
+
+    <div className="max-h-52 space-y-2 overflow-y-auto">
+      {membersLoading ? (
+        <p className="py-4 text-center text-sm text-slate-400">
+          Loading workspace members...
+        </p>
+      ) : workspaceMembers.length === 0 ? (
+        <p className="py-4 text-center text-sm text-slate-400">
+          No other workspace members available.
+        </p>
+      ) : (
+        workspaceMembers.map((member) => {
+          const checked = selectedMemberIds.includes(member.userId);
+
+          return (
+            <label
+              key={member.userId}
+              className={`flex cursor-pointer items-center gap-3 rounded-lg border p-3 transition ${
+                checked
+                  ? "border-indigo-200 bg-indigo-50/60"
+                  : "border-slate-100 hover:bg-slate-50"
+              }`}
+            >
+              <input
+                type="checkbox"
+                checked={checked}
+                onChange={(event) => {
+                  setSelectedMemberIds((previous) =>
+                    event.target.checked
+                      ? [...previous, member.userId]
+                      : previous.filter(
+                          (id) => id !== member.userId
+                        )
+                  );
+                }}
+                className="h-4 w-4 accent-indigo-600"
+              />
+
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold text-slate-700">
+                  {member.name}
+                </p>
+                <p className="truncate text-xs text-slate-400">
+                  {member.email}
+                </p>
+              </div>
+
+              <span className="shrink-0 rounded-full bg-slate-100 px-2 py-1 text-[10px] font-semibold capitalize text-slate-500">
+                {member.workspaceRole}
+              </span>
+            </label>
+          );
+        })
+      )}
+    </div>
+
+    <p className="mt-3 text-xs text-slate-400">
+      You will automatically be added as the project owner.
+      Selected members will initially have the Member role.
+    </p>
+  </div>
+)}
+
               <div>
+
                 <p className="mb-2 text-sm font-semibold text-slate-700">
                   Project color
                 </p>
